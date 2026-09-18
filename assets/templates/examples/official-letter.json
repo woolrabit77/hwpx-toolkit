@@ -1,0 +1,15 @@
+{
+  "template": "official-letter",
+  "data": {
+    "agency_name": "",
+    "document_number": "",
+    "date": "",
+    "recipient": "",
+    "via": "",
+    "subject": "",
+    "body": "",
+    "attachments": "",
+    "sender_name": "",
+    "contact": ""
+  }
+}

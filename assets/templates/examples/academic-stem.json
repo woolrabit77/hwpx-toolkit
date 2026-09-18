@@ -1,0 +1,16 @@
+{
+  "template": "academic-stem",
+  "data": {
+    "journal": "",
+    "doi": "",
+    "title": "",
+    "authors": "",
+    "affiliations": "",
+    "abstract": "",
+    "keywords": "",
+    "introduction": "",
+    "methods": "",
+    "results": "",
+    "references": ""
+  }
+}

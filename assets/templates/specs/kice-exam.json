@@ -1,0 +1,34 @@
+{
+  "id": "kice-exam",
+  "name": "KICE-style examination paper",
+  "description": "Two-column Korean standardized-test paper with session header, instructions, numbered questions, score markers, and fixed footer text.",
+  "defaults": {
+    "year": "",
+    "exam_name": "",
+    "session": "",
+    "subject": "",
+    "instructions": "",
+    "question_1": "",
+    "choices_1": "",
+    "question_2": "",
+    "choices_2": "",
+    "footer": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{exam_name}} {{subject}}",
+      "layout": {"left_mm": 12, "right_mm": 12, "top_mm": 12, "bottom_mm": 12, "columns": 2, "column_gap_mm": 8}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "meta", "text": "{{year}}  {{session}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{exam_name}}"},
+      {"type": "paragraph", "style": "subtitle", "text": "{{subject}}"},
+      {"type": "paragraph", "style": "instruction", "text": "{{instructions}}"},
+      {"type": "paragraph", "style": "question", "text": "1. {{question_1}}"},
+      {"type": "paragraph", "style": "body-small", "text": "{{choices_1}}"},
+      {"type": "paragraph", "style": "question", "text": "2. {{question_2}}"},
+      {"type": "paragraph", "style": "body-small", "text": "{{choices_2}}"},
+      {"type": "paragraph", "style": "source-note", "text": "{{footer}}"}
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "template": "statutory-form",
+  "data": {
+    "form_number": "",
+    "form_title": "",
+    "application_type": "",
+    "name": "",
+    "identifier": "",
+    "address": "",
+    "phone": "",
+    "details": "",
+    "date": "",
+    "signature": "",
+    "instructions": ""
+  }
+}

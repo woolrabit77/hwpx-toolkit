@@ -1,0 +1,33 @@
+{
+  "id": "statutory-form",
+  "name": "Statutory application form",
+  "description": "A4 government application form with grouped fields, checkboxes, signature area, and completion instructions.",
+  "defaults": {
+    "form_number": "",
+    "form_title": "",
+    "application_type": "",
+    "name": "",
+    "identifier": "",
+    "address": "",
+    "phone": "",
+    "details": "",
+    "date": "",
+    "signature": "",
+    "instructions": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{form_title}}",
+      "layout": {"left_mm": 14, "right_mm": 14, "top_mm": 12, "bottom_mm": 12, "columns": 1}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "meta", "text": "Form {{form_number}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{form_title}}"},
+      {"type": "paragraph", "style": "instruction", "text": "☐ {{application_type}}"},
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1, 2, 1, 2], "rows": [[{"value": "Name", "style": "form-label"}, "{{name}}", {"value": "Identifier", "style": "form-label"}, "{{identifier}}"], [{"value": "Address", "style": "form-label"}, "{{address}}", {"value": "Phone", "style": "form-label"}, "{{phone}}"], [{"value": "Application details", "style": "form-label"}, "{{details}}", {"value": "Office use", "style": "form-label"}, ""]]},
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1, 2, 1, 2], "rows": [[{"value": "Date", "style": "form-label"}, "{{date}}", {"value": "Signature", "style": "form-label"}, "{{signature}}"]]},
+      {"type": "heading", "level": 2, "text": "Completion instructions"},
+      {"type": "paragraph", "style": "body-small", "text": "{{instructions}}"}
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "template": "academic-humanities",
+  "data": {
+    "journal": "",
+    "citation": "",
+    "title": "",
+    "english_title": "",
+    "authors": "",
+    "affiliations": "",
+    "abstract": "",
+    "keywords": "",
+    "introduction": "",
+    "main_text": "",
+    "conclusion": "",
+    "references": ""
+  }
+}

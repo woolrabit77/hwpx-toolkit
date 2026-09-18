@@ -1,0 +1,29 @@
+{
+  "id": "press-release",
+  "name": "Government press release",
+  "description": "Public-sector press release with release timing, contacts, headline, subtitle, lead, and hierarchical body.",
+  "defaults": {
+    "release_time": "",
+    "department": "",
+    "contact": "",
+    "title": "",
+    "subtitle": "",
+    "lead": "",
+    "body": "",
+    "reference": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{title}}",
+      "layout": {"left_mm": 20, "right_mm": 20, "top_mm": 15, "bottom_mm": 16, "columns": 1}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "document-title", "text": "PRESS RELEASE"},
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1, 2, 1, 2], "rows": [[{"value": "Release", "style": "form-label"}, "{{release_time}}", {"value": "Department", "style": "form-label"}, "{{department}}"], [{"value": "Contact", "style": "form-label"}, "{{contact}}", {"value": "Reference", "style": "form-label"}, "{{reference}}"]]},
+      {"type": "paragraph", "style": "document-title", "text": "{{title}}"},
+      {"type": "paragraph", "style": "subtitle", "text": "{{subtitle}}"},
+      {"type": "paragraph", "style": "instruction", "text": "{{lead}}"},
+      {"type": "paragraph", "style": "body", "text": "{{body}}"}
+    ]
+  }
+}

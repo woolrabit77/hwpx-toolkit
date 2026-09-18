@@ -1,0 +1,15 @@
+{
+  "template": "kice-exam",
+  "data": {
+    "year": "",
+    "exam_name": "",
+    "session": "",
+    "subject": "",
+    "instructions": "",
+    "question_1": "",
+    "choices_1": "",
+    "question_2": "",
+    "choices_2": "",
+    "footer": ""
+  }
+}

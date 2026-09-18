@@ -1,0 +1,13 @@
+{
+  "template": "press-release",
+  "data": {
+    "release_time": "",
+    "department": "",
+    "contact": "",
+    "title": "",
+    "subtitle": "",
+    "lead": "",
+    "body": "",
+    "reference": ""
+  }
+}

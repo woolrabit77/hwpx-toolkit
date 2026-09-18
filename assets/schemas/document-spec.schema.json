@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HWPX Document Spec",
+  "type": "object",
+  "properties": {
+    "template": {
+      "type": ["null", "string"],
+      "enum": [null, "none", "official-letter", "press-release", "statutory-form", "kice-exam", "academic-humanities", "academic-stem", "policy-report"]
+    },
+    "metadata": {"type": "object"},
+    "data": {"type": "object"},
+    "replace_template_blocks": {"type": "boolean"},
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": ["paragraph", "heading", "equation", "table", "footnote", "endnote", "toc", "index", "chart", "tracked_change", "document_compare", "password", "distribution", "signature"]
+          },
+          "style": {"type": "string"},
+          "text": {"type": "string"},
+          "script": {"type": "string"},
+          "column_widths": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "header_rows": {"type": "integer", "minimum": 0},
+          "border_style": {"enum": ["none", "plain", "subtle", "grid", "form"]}
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

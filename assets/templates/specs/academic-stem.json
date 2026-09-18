@@ -1,0 +1,43 @@
+{
+  "id": "academic-stem",
+  "name": "STEM two-column article",
+  "description": "Compact two-column technical article with abstract, numbered sections, equations, tables, captions, and numbered references.",
+  "defaults": {
+    "journal": "",
+    "doi": "",
+    "title": "",
+    "authors": "",
+    "affiliations": "",
+    "abstract": "",
+    "keywords": "",
+    "introduction": "",
+    "methods": "",
+    "results": "",
+    "references": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{title}}",
+      "author": "{{authors}}",
+      "layout": {"left_mm": 16, "right_mm": 16, "top_mm": 16, "bottom_mm": 16, "columns": 2, "column_gap_mm": 7}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "source-note", "text": "{{journal}}  DOI {{doi}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{title}}"},
+      {"type": "paragraph", "style": "centered", "text": "{{authors}}"},
+      {"type": "paragraph", "style": "source-note", "text": "{{affiliations}}"},
+      {"type": "paragraph", "style": "abstract-title", "text": "Abstract"},
+      {"type": "paragraph", "style": "abstract-body", "text": "{{abstract}}"},
+      {"type": "paragraph", "style": "source-note", "text": "Keywords: {{keywords}}"},
+      {"type": "heading", "level": 1, "text": "1. Introduction", "bookmark": "introduction"},
+      {"type": "paragraph", "style": "body-small", "text": "{{introduction}}"},
+      {"type": "heading", "level": 1, "text": "2. Methods", "bookmark": "methods"},
+      {"type": "paragraph", "style": "body-small", "text": "{{methods}}"},
+      {"type": "heading", "level": 1, "text": "3. Results", "bookmark": "results"},
+      {"type": "paragraph", "style": "body-small", "text": "{{results}}"},
+      {"type": "table", "caption": "Table 1. Results", "border_style": "subtle", "header_rows": 1, "column_widths": [2, 1], "rows": [["Metric", "Value"], ["", ""]]},
+      {"type": "heading", "level": 1, "text": "References", "bookmark": "references"},
+      {"type": "paragraph", "style": "references", "text": "{{references}}"}
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "template": "policy-report",
+  "data": {
+    "report_number": "",
+    "title": "",
+    "subtitle": "",
+    "authors": "",
+    "institution": "",
+    "date": "",
+    "summary": "",
+    "background": "",
+    "analysis": "",
+    "recommendations": "",
+    "appendix": ""
+  }
+}

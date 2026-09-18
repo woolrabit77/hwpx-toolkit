@@ -1,0 +1,33 @@
+{
+  "id": "official-letter",
+  "name": "Official outgoing letter",
+  "description": "Korean public-sector outgoing letter with recipient, subject, body, attachments, approval identity, and contact footer.",
+  "defaults": {
+    "agency_name": "",
+    "document_number": "",
+    "date": "",
+    "recipient": "",
+    "via": "",
+    "subject": "",
+    "body": "",
+    "attachments": "",
+    "sender_name": "",
+    "contact": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{subject}}",
+      "author": "{{sender_name}}",
+      "layout": {"left_mm": 20, "right_mm": 20, "top_mm": 16, "bottom_mm": 16, "columns": 1}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "meta", "text": "Document No. {{document_number}}  |  Date {{date}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{agency_name}}"},
+      {"type": "table", "border_style": "subtle", "header_rows": 0, "column_widths": [1, 5], "rows": [[{"value": "Recipient", "style": "form-label"}, "{{recipient}}"], [{"value": "Via", "style": "form-label"}, "{{via}}"], [{"value": "Subject", "style": "form-label"}, "{{subject}}"]]},
+      {"type": "paragraph", "style": "body", "text": "{{body}}"},
+      {"type": "paragraph", "style": "body-small", "text": "Attachment: {{attachments}}"},
+      {"type": "paragraph", "style": "right", "text": "{{sender_name}}"},
+      {"type": "paragraph", "style": "source-note", "text": "{{contact}}"}
+    ]
+  }
+}

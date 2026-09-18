@@ -1,0 +1,44 @@
+{
+  "id": "academic-humanities",
+  "name": "Humanities and social-science article",
+  "description": "Single-column Korean journal article with bilingual titles, author metadata, abstract, keywords, footnotes, and hanging-reference style.",
+  "defaults": {
+    "journal": "",
+    "citation": "",
+    "title": "",
+    "english_title": "",
+    "authors": "",
+    "affiliations": "",
+    "abstract": "",
+    "keywords": "",
+    "introduction": "",
+    "main_text": "",
+    "conclusion": "",
+    "references": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{title}}",
+      "author": "{{authors}}",
+      "layout": {"left_mm": 25, "right_mm": 25, "top_mm": 20, "bottom_mm": 18, "columns": 1}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "source-note", "text": "{{journal}}  {{citation}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{title}}"},
+      {"type": "paragraph", "style": "subtitle", "text": "{{english_title}}"},
+      {"type": "paragraph", "style": "centered", "text": "{{authors}}"},
+      {"type": "paragraph", "style": "source-note", "text": "{{affiliations}}"},
+      {"type": "paragraph", "style": "abstract-title", "text": "Abstract"},
+      {"type": "paragraph", "style": "abstract-body", "text": "{{abstract}}"},
+      {"type": "paragraph", "style": "source-note", "text": "Keywords: {{keywords}}"},
+      {"type": "heading", "level": 1, "text": "1. Introduction", "bookmark": "introduction"},
+      {"type": "paragraph", "style": "body", "text": "{{introduction}}"},
+      {"type": "heading", "level": 1, "text": "2. Main text", "bookmark": "main-text"},
+      {"type": "paragraph", "style": "body", "text": "{{main_text}}"},
+      {"type": "heading", "level": 1, "text": "3. Conclusion", "bookmark": "conclusion"},
+      {"type": "paragraph", "style": "body", "text": "{{conclusion}}"},
+      {"type": "heading", "level": 1, "text": "References", "bookmark": "references"},
+      {"type": "paragraph", "style": "references", "text": "{{references}}"}
+    ]
+  }
+}

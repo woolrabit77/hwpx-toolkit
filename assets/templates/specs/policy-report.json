@@ -1,0 +1,45 @@
+{
+  "id": "policy-report",
+  "name": "Policy and research report",
+  "description": "Korean policy report with registration number, cover metadata, executive summary, linked contents, chapters, tables, and appendices.",
+  "defaults": {
+    "report_number": "",
+    "title": "",
+    "subtitle": "",
+    "authors": "",
+    "institution": "",
+    "date": "",
+    "summary": "",
+    "background": "",
+    "analysis": "",
+    "recommendations": "",
+    "appendix": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{title}}",
+      "author": "{{authors}}",
+      "layout": {"left_mm": 24, "right_mm": 24, "top_mm": 20, "bottom_mm": 18, "columns": 1}
+    },
+    "blocks": [
+      {"type": "paragraph", "style": "meta", "text": "{{report_number}}"},
+      {"type": "paragraph", "style": "document-title", "text": "{{title}}"},
+      {"type": "paragraph", "style": "subtitle", "text": "{{subtitle}}"},
+      {"type": "paragraph", "style": "centered", "text": "{{authors}}"},
+      {"type": "paragraph", "style": "centered", "text": "{{institution}}"},
+      {"type": "paragraph", "style": "centered", "text": "{{date}}"},
+      {"type": "heading", "level": 1, "text": "Executive summary", "bookmark": "summary"},
+      {"type": "paragraph", "style": "body", "text": "{{summary}}"},
+      {"type": "heading", "level": 1, "text": "Contents"},
+      {"type": "toc", "levels": [1, 2]},
+      {"type": "heading", "level": 1, "text": "1. Background", "bookmark": "background"},
+      {"type": "paragraph", "style": "body", "text": "{{background}}"},
+      {"type": "heading", "level": 1, "text": "2. Analysis", "bookmark": "analysis"},
+      {"type": "paragraph", "style": "body", "text": "{{analysis}}"},
+      {"type": "heading", "level": 1, "text": "3. Recommendations", "bookmark": "recommendations"},
+      {"type": "paragraph", "style": "body", "text": "{{recommendations}}"},
+      {"type": "heading", "level": 1, "text": "Appendix", "bookmark": "appendix"},
+      {"type": "paragraph", "style": "body-small", "text": "{{appendix}}"}
+    ]
+  }
+}
