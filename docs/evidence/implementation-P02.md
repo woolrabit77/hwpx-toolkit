@@ -3,7 +3,8 @@
 ## Candidate
 
 - Feature: P02 — semantic headers, footers, editable page-number fields, explicit page breaks, and multi-section documents.
-- Candidate commit: `2f1598ea37d1223802302de591ad8defd4ff6684`
+- Initial candidate commit: `2f1598ea37d1223802302de591ad8defd4ff6684`
+- Rework candidate commit (current): `17de789a3f71f46cbf2979d0a64510861be2fd6e`
 - Worktree: `C:\Users\woolr\Documents\Codex\2026-09-18\new-chat\work\hwpx-toolkit-p02-luna`
 - Standalone path: Python HWPX generation and validation only; no Hancom Office, COM, LibreOffice, renderer, network, or web dependency.
 
@@ -35,7 +36,7 @@ All commands were run from the candidate worktree with the bundled Python runtim
 ```powershell
 $py='C:\Users\woolr\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
 & $py -m unittest discover -s tests
-# Ran 29 tests ... OK
+# Ran 30 tests ... OK
 
 & $py scripts/hwpx_tool.py build tests/fixtures/p02-headers-breaks.json -o work/p02-cli.hwpx
 # validation: passed; blocks: 4; sections are emitted as section0 and section1
@@ -54,6 +55,8 @@ Get-FileHash tests/fixtures/p02-headers-breaks.hwpx -Algorithm SHA256
 ```
 
 The positive test checks manifest declaration of `Contents/section1.xml`, semantic header/footer nodes, native page-number controls, and absence of manual page-number text. Negative tests reject unsupported page-number positions, string/manual page-number values, and section-break blocks nested in the `sections` API.
+
+The first Terra cycle identified a fail-open parser defect: ignored keys such as `text` on `page_break` and arbitrary keys alongside header/footer or page-number controls were silently accepted. Rework commit `17de789a3f71f46cbf2979d0a64510861be2fd6e` adds allowlists for all P02 control wrappers and a parser-plus-CLI regression test. Each malformed request now exits with code 2 and leaves no output file.
 
 ## Limitations
 
