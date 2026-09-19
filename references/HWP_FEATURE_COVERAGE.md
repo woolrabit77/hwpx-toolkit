@@ -13,8 +13,8 @@ This is a practical priority list, not measured usage telemetry. Hancom does not
 | 7 | Character formatting | Preset styles supported |
 | 8 | Paragraph formatting | Alignment, margins, spacing, and keep rules supported |
 | 9 | Styles | Named preset paragraph/character styles supported |
-| 10 | Tabs and indents | Partial preset support |
-| 11 | Bullets and numbering | Partial; explicit text numbering is reliable |
+| 10 | Tabs and indents | Supported through semantic `tabs` and `indent` paragraph properties |
+| 11 | Bullets and numbering | Supported through editable HWPML numbering and bullet definitions |
 | 12 | Page setup and margins | Supported per template profile |
 | 13 | Headers, footers, page numbers | Partial; static footer text only in the standalone core |
 | 14 | Page, column, section breaks | Column profile supported; advanced multi-section work is limited |

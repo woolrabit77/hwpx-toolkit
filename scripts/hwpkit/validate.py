@@ -345,7 +345,12 @@ def inspect_hwpx(path: Path) -> dict[str, object]:
     with ZipFile(path) as archive:
         names = archive.namelist()
         counts: Counter[str] = Counter()
+        header_counts: Counter[str] = Counter()
         bookmarks: list[str] = []
+        header = ET.fromstring(archive.read("Contents/header.xml")) if "Contents/header.xml" in names else None
+        if header is not None:
+            for element in header.iter():
+                header_counts[_local(element.tag)] += 1
         for name in names:
             if not (name.startswith("Contents/section") and name.endswith(".xml")):
                 continue
@@ -365,4 +370,8 @@ def inspect_hwpx(path: Path) -> dict[str, object]:
             "endnotes": counts["endNote"],
             "bookmarks": bookmarks,
             "fields": counts["fieldBegin"],
+            "numberings": header_counts["numbering"],
+            "bullets": header_counts["bullet"],
+            "tab_stops": header_counts["tabItem"],
+            "formatted_paragraph_properties": max(0, header_counts["paraPr"] - header_counts["style"]),
         }

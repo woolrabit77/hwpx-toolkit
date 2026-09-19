@@ -77,11 +77,12 @@ def q(namespace: str, name: str) -> str:
 def serialize_document(document: Document, registry: IdRegistry) -> dict[str, bytes]:
     images = _collect_images(document)
     image_ids = {id(image): f"image{index}" for index, image in enumerate(images, start=1)}
-    section, preview = _section(document, registry, image_ids)
+    paragraph_profiles = _paragraph_profiles(document)
+    section, preview = _section(document, registry, image_ids, paragraph_profiles)
     parts = {
         "version.xml": _version_xml(),
         "settings.xml": _xml_bytes(_settings()),
-        "Contents/header.xml": _xml_bytes(_header()),
+        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles)),
         "Contents/section0.xml": _xml_bytes(section),
         "Contents/content.hpf": _xml_bytes(_content(document, images)),
         "META-INF/container.xml": _container_xml(),
@@ -94,8 +95,27 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
     return parts
 
 
-def _header() -> ET.Element:
+def _header(paragraph_profiles: list[dict[str, object]] | None = None) -> ET.Element:
     _validate_style_specs()
+    paragraph_profiles = paragraph_profiles or []
+    numbering_profiles: dict[tuple[str, int], int] = {}
+    bullet_profiles: dict[str, int] = {}
+    tab_profiles: dict[tuple[tuple[int, str, str], ...], int] = {(): 0}
+    for profile in paragraph_profiles:
+        tabs = tuple((int(item["position"]), str(item["type"]), str(item["leader"])) for item in profile["tabs"])
+        if tabs not in tab_profiles:
+            tab_profiles[tabs] = len(tab_profiles)
+        profile["tab_id"] = tab_profiles[tabs]
+        if profile["list_type"] == "numbering":
+            key = (str(profile["list_format"]), int(profile["list_start"]))
+            if key not in numbering_profiles:
+                numbering_profiles[key] = len(numbering_profiles) + 1
+            profile["list_id"] = numbering_profiles[key]
+        elif profile["list_type"] == "bullet":
+            char = str(profile["bullet_char"])
+            if char not in bullet_profiles:
+                bullet_profiles[char] = len(bullet_profiles) + 1
+            profile["list_id"] = bullet_profiles[char]
     root = ET.Element(q(HH, "head"), {"version": "1.5", "secCnt": "1"})
     ET.SubElement(
         root,
@@ -128,33 +148,112 @@ def _header() -> ET.Element:
         ET.SubElement(char_pr, q(HH, "offset"), all_zero_spacing)
         if spec.get("bold"):
             ET.SubElement(char_pr, q(HH, "bold"))
-    tab_properties = ET.SubElement(ref_list, q(HH, "tabProperties"), {"itemCnt": "1"})
-    ET.SubElement(tab_properties, q(HH, "tabPr"), {"id": "0", "autoTabLeft": "0", "autoTabRight": "0"})
-    ET.SubElement(ref_list, q(HH, "numberings"), {"itemCnt": "0"})
-    ET.SubElement(ref_list, q(HH, "bullets"), {"itemCnt": "0"})
-    para_properties = ET.SubElement(ref_list, q(HH, "paraProperties"), {"itemCnt": str(len(STYLE_SPECS))})
+    tab_properties = ET.SubElement(ref_list, q(HH, "tabProperties"), {"itemCnt": str(len(tab_profiles))})
+    for tabs, tab_id in sorted(((key, value) for key, value in tab_profiles.items()), key=lambda item: item[1]):
+        tab_pr = ET.SubElement(tab_properties, q(HH, "tabPr"), {"id": str(tab_id), "autoTabLeft": "0", "autoTabRight": "0"})
+        for position, tab_type, leader in tabs:
+            ET.SubElement(tab_pr, q(HH, "tabItem"), {"pos": str(position), "type": tab_type, "leader": leader})
+    numberings = ET.SubElement(ref_list, q(HH, "numberings"), {"itemCnt": str(len(numbering_profiles))})
+    for (number_format, start), numbering_id in sorted(numbering_profiles.items(), key=lambda item: item[1]):
+        numbering = ET.SubElement(numberings, q(HH, "numbering"), {"id": str(numbering_id), "start": str(start)})
+        for level in range(1, 11):
+            para_head = ET.SubElement(numbering, q(HH, "paraHead"), {
+                "start": "1", "level": str(level), "align": "LEFT", "useInstWidth": "1",
+                "autoIndent": "1", "widthAdjust": "0", "textOffsetType": "PERCENT", "textOffset": "50",
+                "numFormat": number_format, "charPrIDRef": "4294967295", "checkable": "0",
+            })
+            para_head.text = f"^{level}."
+    bullets = ET.SubElement(ref_list, q(HH, "bullets"), {"itemCnt": str(len(bullet_profiles))})
+    for char, bullet_id in sorted(bullet_profiles.items(), key=lambda item: item[1]):
+        ET.SubElement(bullets, q(HH, "bullet"), {"id": str(bullet_id), "char": char})
+    para_properties = ET.SubElement(ref_list, q(HH, "paraProperties"), {"itemCnt": str(len(STYLE_SPECS) + len(paragraph_profiles))})
     for style_id, spec in enumerate(STYLE_SPECS):
-        para_pr = ET.SubElement(para_properties, q(HH, "paraPr"), {"id": str(style_id), "tabPrIDRef": "0", "condense": "0", "fontLineHeight": "0", "snapToGrid": "1", "suppressLineNumbers": "0", "checked": "0"})
-        ET.SubElement(para_pr, q(HH, "align"), {"horizontal": str(spec.get("align", "LEFT")), "vertical": "BASELINE"})
-        ET.SubElement(para_pr, q(HH, "heading"), {"type": "NONE", "idRef": "0", "level": "0"})
-        ET.SubElement(para_pr, q(HH, "breakSetting"), {"breakLatinWord": "KEEP_WORD", "breakNonLatinWord": "KEEP_WORD", "widowOrphan": "1", "keepWithNext": "1" if spec.get("keep") else "0", "keepLines": "0", "pageBreakBefore": "0", "lineWrap": "BREAK"})
-        margin = ET.SubElement(para_pr, q(HH, "margin"))
-        values = {
-            "intent": int(spec.get("intent", 0)),
-            "left": int(spec.get("left", 0)),
-            "right": int(spec.get("right", 0)),
-            "prev": int(spec.get("before", 0)),
-            "next": int(spec.get("after", 0)),
-        }
-        for side, value in values.items():
-            ET.SubElement(margin, q(HC, side), {"value": str(value), "unit": "HWPUNIT"})
-        ET.SubElement(para_pr, q(HH, "lineSpacing"), {"type": "PERCENT", "value": str(spec.get("line", 160)), "unit": "CHAR"})
-        ET.SubElement(para_pr, q(HH, "autoSpacing"), {"eAsianEng": "0", "eAsianNum": "0"})
+        _write_para_property(para_properties, style_id, spec, tab_id=0, list_type=None, list_id=0, list_level=0)
+    for index, profile in enumerate(paragraph_profiles, start=len(STYLE_SPECS)):
+        list_type = {"numbering": "NUMBER", "bullet": "BULLET"}.get(str(profile["list_type"]), None)
+        _write_para_property(para_properties, index, profile["style_spec"], tab_id=int(profile["tab_id"]), list_type=list_type, list_id=int(profile.get("list_id") or 0), list_level=int(profile["list_level"]), indent=profile["indent"])
     styles = ET.SubElement(ref_list, q(HH, "styles"), {"itemCnt": str(len(STYLE_SPECS))})
     for style_id, spec in enumerate(STYLE_SPECS):
         name = str(spec["name"])
         ET.SubElement(styles, q(HH, "style"), {"id": str(style_id), "type": "PARA", "name": name, "engName": name, "paraPrIDRef": str(style_id), "charPrIDRef": str(style_id), "nextStyleIDRef": "0", "langID": "1033", "lockForm": "0"})
     return root
+
+
+def _write_para_property(
+    parent: ET.Element,
+    para_id: int,
+    spec: dict[str, object],
+    *,
+    tab_id: int,
+    list_type: str | None,
+    list_id: int,
+    list_level: int,
+    indent: dict[str, int] | None = None,
+) -> None:
+    para_pr = ET.SubElement(parent, q(HH, "paraPr"), {"id": str(para_id), "tabPrIDRef": str(tab_id), "condense": "0", "fontLineHeight": "0", "snapToGrid": "1", "suppressLineNumbers": "0", "checked": "0"})
+    ET.SubElement(para_pr, q(HH, "align"), {"horizontal": str(spec.get("align", "LEFT")), "vertical": "BASELINE"})
+    heading_type = list_type if list_type in {"NUMBER", "BULLET"} else "NONE"
+    ET.SubElement(para_pr, q(HH, "heading"), {"type": heading_type, "idRef": str(list_id), "level": str(list_level if heading_type != "NONE" else 0)})
+    ET.SubElement(para_pr, q(HH, "breakSetting"), {"breakLatinWord": "KEEP_WORD", "breakNonLatinWord": "KEEP_WORD", "widowOrphan": "1", "keepWithNext": "1" if spec.get("keep") else "0", "keepLines": "0", "pageBreakBefore": "0", "lineWrap": "BREAK"})
+    margin = ET.SubElement(para_pr, q(HH, "margin"))
+    values = {
+        "intent": int(spec.get("intent", 0)),
+        "left": int(spec.get("left", 0)),
+        "right": int(spec.get("right", 0)),
+        "prev": int(spec.get("before", 0)),
+        "next": int(spec.get("after", 0)),
+    }
+    for key, value in (indent or {}).items():
+        if key == "first_line":
+            values["intent"] = value
+        elif key in {"left", "right"}:
+            values[key] = value
+    for side, value in values.items():
+        ET.SubElement(margin, q(HC, side), {"value": str(value), "unit": "HWPUNIT"})
+    ET.SubElement(para_pr, q(HH, "lineSpacing"), {"type": "PERCENT", "value": str(spec.get("line", 160)), "unit": "CHAR"})
+    ET.SubElement(para_pr, q(HH, "autoSpacing"), {"eAsianEng": "0", "eAsianNum": "0"})
+
+
+def _paragraph_profiles(document: Document) -> list[dict[str, object]]:
+    """Return deterministic dynamic paragraph properties for P01 formatting."""
+    profiles: list[dict[str, object]] = []
+    by_key: dict[tuple[object, ...], dict[str, object]] = {}
+    for block in document.blocks:
+        if not isinstance(block, Paragraph):
+            continue
+        if not block.tabs and not block.indent and not block.list_type:
+            continue
+        tabs = tuple((int(item["position"]), str(item["type"]), str(item["leader"])) for item in block.tabs)
+        indent = tuple(sorted((str(key), int(value)) for key, value in block.indent.items()))
+        key = (
+            _style_id(block.style),
+            tabs,
+            indent,
+            block.list_type,
+            int(block.list_level),
+            int(block.list_start),
+            str(block.list_format),
+            str(block.bullet_char),
+        )
+        profile = by_key.get(key)
+        if profile is None:
+            profile = {
+                "block_id": id(block),
+                "tabs": [dict(item) for item in block.tabs],
+                "indent": dict(block.indent),
+                "list_type": block.list_type,
+                "list_level": block.list_level,
+                "list_start": block.list_start,
+                "list_format": block.list_format,
+                "bullet_char": block.bullet_char,
+                "style_spec": STYLE_SPECS[_style_id(block.style)],
+            }
+            by_key[key] = profile
+            profiles.append(profile)
+        profile.setdefault("block_ids", []).append(id(block))
+    for index, profile in enumerate(profiles, start=len(STYLE_SPECS)):
+        profile["para_id"] = index
+    return profiles
 
 
 def _content(document: Document, images: list[ImageAsset]) -> ET.Element:
@@ -241,15 +340,27 @@ def _container_rdf() -> bytes:
     ).encode("utf-8")
 
 
-def _section(document: Document, registry: IdRegistry, image_ids: dict[int, str]) -> tuple[ET.Element, str]:
+def _section(
+    document: Document,
+    registry: IdRegistry,
+    image_ids: dict[int, str],
+    paragraph_profiles: list[dict[str, object]] | None = None,
+) -> tuple[ET.Element, str]:
     root = ET.Element(q(HS, "sec"))
     preview: list[str] = []
     paragraph_id = 1
     note_number = 1
     first_block = True
+    paragraph_profiles = paragraph_profiles or []
+    paragraph_ids = {
+        int(block_id): int(profile["para_id"])
+        for profile in paragraph_profiles
+        for block_id in profile.get("block_ids", [profile.get("block_id")])
+        if block_id is not None
+    }
     for block in document.blocks:
         if isinstance(block, Paragraph):
-            _write_paragraph(root, block, registry, paragraph_id, document.metadata, section_start=first_block)
+            _write_paragraph(root, block, registry, paragraph_id, document.metadata, section_start=first_block, para_pr_id=paragraph_ids.get(id(block)))
             preview.extend(run.text for run in block.runs if run.text)
             paragraph_id += 1
         elif isinstance(block, Table):
@@ -293,10 +404,11 @@ def _write_paragraph(
     metadata: dict[str, object],
     *,
     section_start: bool = False,
+    para_pr_id: int | None = None,
 ) -> None:
     style_id = _style_id(paragraph.style)
     p = _new_paragraph(parent, paragraph_id, style_id)
-    p.set("paraPrIDRef", str(style_id))
+    p.set("paraPrIDRef", str(para_pr_id if para_pr_id is not None else style_id))
     if section_start:
         _write_section_properties(p, metadata)
     if paragraph.bookmark:
@@ -652,10 +764,14 @@ def _style_id(name: str) -> int:
 def _write_text(parent: ET.Element, value: str) -> None:
     lines = value.split("\n")
     for index, line in enumerate(lines):
-        text = ET.SubElement(parent, q(HP, "t"))
-        text.text = line
-        if line[:1].isspace() or line[-1:].isspace():
-            text.set(q(XML, "space"), "preserve")
+        tab_parts = line.split("\t")
+        for tab_index, tab_part in enumerate(tab_parts):
+            text = ET.SubElement(parent, q(HP, "t"))
+            text.text = tab_part
+            if tab_part[:1].isspace() or tab_part[-1:].isspace():
+                text.set(q(XML, "space"), "preserve")
+            if tab_index < len(tab_parts) - 1:
+                ET.SubElement(parent, q(HP, "tab"))
         if index < len(lines) - 1:
             ET.SubElement(parent, q(HP, "lineBreak"))
 

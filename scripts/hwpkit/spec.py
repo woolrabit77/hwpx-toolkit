@@ -16,6 +16,17 @@ from .templates import apply_template
 
 ALLOWED_SCHEMES = {"http", "https", "mailto"}
 TABLE_BORDER_STYLES = {"none", "plain", "subtle", "grid", "form"}
+TAB_TYPES = {"LEFT", "CENTER", "RIGHT", "DECIMAL"}
+TAB_LEADERS = {"NONE", "SOLID", "DOTTED", "DASHED"}
+NUMBER_FORMATS = {
+    "DIGIT",
+    "CIRCLED_DIGIT",
+    "HANGUL_SYLLABLE",
+    "LATIN_SMALL",
+    "LATIN_CAPITAL",
+    "ROMAN_SMALL",
+    "ROMAN_CAPITAL",
+}
 
 
 def parse_document_spec(raw: dict[str, Any], *, base_dir: Path | None = None) -> tuple[Document, IdRegistry]:
@@ -141,13 +152,130 @@ def _parse_paragraph(block: dict[str, Any], registry: IdRegistry, *, heading: bo
             )
         )
     level = _positive_int(block.get("level", 1), "heading.level") if heading else None
+    tabs = _parse_tabs(block.get("tabs", block.get("tab_stops", [])))
+    indent = _parse_indent(block)
+    list_type, list_level, list_start, list_format, bullet_char = _parse_list(block)
     return Paragraph(
         runs=runs,
         style=f"heading-{level}" if heading else str(block.get("style", "body")),
         heading_level=level,
         bookmark=str(block.get("bookmark")) if block.get("bookmark") else None,
         index_terms=[str(value) for value in block.get("index_terms", [])],
+        tabs=tabs,
+        indent=indent,
+        list_type=list_type,
+        list_level=list_level,
+        list_start=list_start,
+        list_format=list_format,
+        bullet_char=bullet_char,
     )
+
+
+def _parse_tabs(raw: object) -> list[dict[str, object]]:
+    if raw in (None, []):
+        return []
+    if not isinstance(raw, list):
+        raise SpecError("paragraph.tabs must be an array.")
+    parsed: list[dict[str, object]] = []
+    previous = -1
+    for index, value in enumerate(raw):
+        if not isinstance(value, dict):
+            raise SpecError(f"paragraph.tabs[{index}] must be an object.")
+        try:
+            position = int(value.get("position", value.get("pos", 0)))
+        except (TypeError, ValueError) as exc:
+            raise SpecError(f"paragraph.tabs[{index}].position must be a non-negative integer.") from exc
+        if position < 0 or position <= previous:
+            raise SpecError("paragraph tab positions must be strictly increasing non-negative integers.")
+        tab_type = str(value.get("type", "LEFT")).upper()
+        leader = str(value.get("leader", "NONE")).upper()
+        if tab_type not in TAB_TYPES:
+            raise SpecError(f"paragraph.tabs[{index}].type must be one of: {', '.join(sorted(TAB_TYPES))}.")
+        if leader not in TAB_LEADERS:
+            raise SpecError(f"paragraph.tabs[{index}].leader must be one of: {', '.join(sorted(TAB_LEADERS))}.")
+        parsed.append({"position": position, "type": tab_type, "leader": leader})
+        previous = position
+    return parsed
+
+
+def _parse_indent(block: dict[str, Any]) -> dict[str, int]:
+    raw = block.get("indent", {})
+    if raw in (None, {}):
+        raw = {}
+    if not isinstance(raw, dict):
+        raise SpecError("paragraph.indent must be an object.")
+    aliases = {
+        "left": "left",
+        "right": "right",
+        "first_line": "first_line",
+        "firstLine": "first_line",
+        "hanging": "first_line",
+    }
+    parsed: dict[str, int] = {}
+    for source, target in aliases.items():
+        if source not in raw:
+            continue
+        try:
+            parsed[target] = int(raw[source])
+        except (TypeError, ValueError) as exc:
+            raise SpecError(f"paragraph.indent.{source} must be an integer HWPUNIT value.") from exc
+    for source, target in (("indent_left", "left"), ("indent_right", "right"), ("first_line_indent", "first_line")):
+        if source in block and target not in parsed:
+            try:
+                parsed[target] = int(block[source])
+            except (TypeError, ValueError) as exc:
+                raise SpecError(f"{source} must be an integer HWPUNIT value.") from exc
+    return parsed
+
+
+def _parse_list(block: dict[str, Any]) -> tuple[str | None, int, int, str, str]:
+    candidates: list[tuple[str, object]] = []
+    for key in ("bullet", "numbering", "list"):
+        if key in block and block[key] not in (None, False):
+            candidates.append((key, block[key]))
+    if len(candidates) > 1:
+        raise SpecError("A paragraph may specify only one of bullet, numbering, or list.")
+    if not candidates:
+        return None, 1, 1, "DIGIT", "•"
+    key, raw = candidates[0]
+    if key == "list":
+        if not isinstance(raw, dict):
+            raise SpecError("paragraph.list must be an object.")
+        kind = str(raw.get("type", raw.get("kind", "numbering"))).lower()
+        config = raw
+    elif isinstance(raw, dict):
+        kind = "bullet" if key == "bullet" else "numbering"
+        config = raw
+    elif raw is True:
+        kind = "bullet" if key == "bullet" else "numbering"
+        config = {}
+    else:
+        raise SpecError(f"paragraph.{key} must be true or an object.")
+    if kind in {"number", "numbered", "ordered"}:
+        kind = "numbering"
+    if kind not in {"bullet", "numbering"}:
+        raise SpecError("paragraph.list.type must be 'bullet' or 'numbering'.")
+    try:
+        level = int(config.get("level", 1))
+    except (TypeError, ValueError) as exc:
+        raise SpecError("List level must be an integer from 1 to 10.") from exc
+    if level < 1 or level > 10:
+        raise SpecError("List level must be between 1 and 10.")
+    try:
+        start = int(config.get("start", 1))
+    except (TypeError, ValueError) as exc:
+        raise SpecError("List start must be a positive integer.") from exc
+    if start < 1:
+        raise SpecError("List start must be a positive integer.")
+    if kind == "bullet":
+        char = str(config.get("char", config.get("bullet_char", "•")))
+        if len(char) != 1:
+            raise SpecError("Bullet char must contain exactly one Unicode character.")
+        return kind, level, start, "DIGIT", char
+    list_format = str(config.get("format", config.get("number_format", "DIGIT"))).upper()
+    if list_format not in NUMBER_FORMATS:
+        raise SpecError(f"Number format must be one of: {', '.join(sorted(NUMBER_FORMATS))}.")
+    return kind, level, start, list_format, "•"
 
 
 def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Table:

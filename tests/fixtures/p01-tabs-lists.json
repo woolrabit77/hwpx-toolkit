@@ -1,0 +1,23 @@
+{
+  "template": null,
+  "metadata": {
+    "title": "P01 tabs, indents, bullets, and numbering fixture",
+    "author": "Codex",
+    "layout": {"profile": "standard-a4", "columns": 1}
+  },
+  "blocks": [
+    {
+      "type": "paragraph",
+      "tabs": [
+        {"position": 2400, "type": "LEFT", "leader": "NONE"},
+        {"position": 7200, "type": "RIGHT", "leader": "DOTTED"}
+      ],
+      "indent": {"left": 1200, "first_line": -600},
+      "text": "A tabbed\tparagraph with a hanging indent."
+    },
+    {"type": "paragraph", "bullet": {"level": 1, "char": "•"}, "text": "Semantic bullet item"},
+    {"type": "paragraph", "bullet": {"level": 2, "char": "▪"}, "text": "Semantic nested bullet item"},
+    {"type": "paragraph", "numbering": {"level": 1, "start": 1, "format": "DIGIT"}, "text": "Semantic numbered item"},
+    {"type": "paragraph", "numbering": {"level": 2, "start": 1, "format": "DIGIT"}, "text": "Semantic nested numbered item"}
+  ]
+}

@@ -20,6 +20,14 @@ class Paragraph:
     heading_level: int | None = None
     bookmark: str | None = None
     index_terms: list[str] = field(default_factory=list)
+    tabs: list[dict[str, object]] = field(default_factory=list)
+    indent: dict[str, int] = field(default_factory=dict)
+    list_type: str | None = None
+    list_level: int = 1
+    list_id: int | None = None
+    list_start: int = 1
+    list_format: str = "DIGIT"
+    bullet_char: str = "•"
 
 
 @dataclass

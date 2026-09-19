@@ -22,6 +22,42 @@
           "style": {"type": "string"},
           "text": {"type": "string"},
           "script": {"type": "string"},
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["position"],
+              "properties": {
+                "position": {"type": "integer", "minimum": 0},
+                "type": {"enum": ["LEFT", "CENTER", "RIGHT", "DECIMAL"]},
+                "leader": {"enum": ["NONE", "SOLID", "DOTTED", "DASHED"]}
+              }
+            }
+          },
+          "tab_stops": {"$ref": "#/properties/blocks/items/properties/tabs"},
+          "indent": {
+            "type": "object",
+            "properties": {
+              "left": {"type": "integer"},
+              "right": {"type": "integer"},
+              "first_line": {"type": "integer"},
+              "hanging": {"type": "integer"}
+            },
+            "additionalProperties": false
+          },
+          "bullet": {
+            "oneOf": [
+              {"type": "boolean"},
+              {"type": "object", "properties": {"level": {"type": "integer", "minimum": 1, "maximum": 10}, "char": {"type": "string", "minLength": 1, "maxLength": 1}}}
+            ]
+          },
+          "numbering": {
+            "oneOf": [
+              {"type": "boolean"},
+              {"type": "object", "properties": {"level": {"type": "integer", "minimum": 1, "maximum": 10}, "start": {"type": "integer", "minimum": 1}, "format": {"type": "string"}}}
+            ]
+          },
+          "list": {"type": "object"},
           "column_widths": {"type": "array", "items": {"type": "integer", "minimum": 1}},
           "row_heights_mm": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}},
           "header_rows": {"type": "integer", "minimum": 0},

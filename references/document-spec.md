@@ -63,6 +63,44 @@ Additional `blocks` are appended after the template. Set `replace_template_block
 - `toc`: linked entries for selected heading levels; static page numbers are not generated
 - `index`: sorted unique terms
 
+### Paragraph layout and lists
+
+Paragraphs may carry semantic tab stops, indentation, and list properties. Positions and margins are HWPUNIT integers; they are not rendered as spaces or literal list prefixes.
+
+```json
+{
+  "type": "paragraph",
+  "tabs": [
+    {"position": 3600, "type": "LEFT", "leader": "NONE"},
+    {"position": 7200, "type": "RIGHT", "leader": "DOTTED"}
+  ],
+  "indent": {"left": 1200, "first_line": -600, "right": 300},
+  "text": "A paragraph with a real tab and hanging indent."
+}
+```
+
+Supported tab types are `LEFT`, `CENTER`, `RIGHT`, and `DECIMAL`; leaders are `NONE`, `SOLID`, `DOTTED`, and `DASHED`. Tab positions must be strictly increasing. Indent values may be negative for a hanging first line.
+
+Use `bullet` or `numbering` for editable list paragraphs. List levels are 1–10. Number formats include `DIGIT`, `CIRCLED_DIGIT`, `HANGUL_SYLLABLE`, `LATIN_SMALL`, `LATIN_CAPITAL`, `ROMAN_SMALL`, and `ROMAN_CAPITAL`.
+
+```json
+{
+  "type": "paragraph",
+  "bullet": {"level": 2, "char": "▪"},
+  "text": "A genuine bullet paragraph"
+}
+```
+
+```json
+{
+  "type": "paragraph",
+  "numbering": {"level": 1, "start": 1, "format": "DIGIT"},
+  "text": "A genuine numbered paragraph"
+}
+```
+
+The writer emits HWPML `hh:tabPr`, `hh:paraPr` margin/heading references, `hh:numbering`/`hh:paraHead`, and `hh:bullet` definitions. It never prepends bullet glyphs or number text to paragraph content. Invalid levels, tab order, tab kinds, list kinds, and number formats are rejected with `SpecError`.
+
 ## Paragraph styles
 
 The stable preset style names include `document-title`, `subtitle`, `meta`, `heading-1`, `heading-2`, `heading-3`, `body`, `body-small`, `centered`, `right`, `question`, `instruction`, `form-label`, `table-cell`, `table-header`, `abstract-title`, `abstract-body`, `references`, and `source-note`.

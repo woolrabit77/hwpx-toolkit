@@ -53,6 +53,16 @@ class SpecTests(unittest.TestCase):
         with self.assertRaises(SpecError):
             parse_document_spec({"metadata": {"layout": {"profile": "unknown"}}, "blocks": []})
 
+    def test_p01_rejects_invalid_list_level_and_tab_order(self) -> None:
+        with self.assertRaisesRegex(SpecError, "between 1 and 10"):
+            parse_document_spec({"blocks": [{"type": "paragraph", "numbering": {"level": 11}, "text": "x"}]})
+        with self.assertRaisesRegex(SpecError, "strictly increasing"):
+            parse_document_spec({"blocks": [{"type": "paragraph", "tabs": [{"position": 100}, {"position": 100}], "text": "x"}]})
+
+    def test_p01_rejects_invalid_number_format(self) -> None:
+        with self.assertRaisesRegex(SpecError, "Number format"):
+            parse_document_spec({"blocks": [{"type": "paragraph", "numbering": {"format": "EMOJI"}, "text": "x"}]})
+
 
 class PipelineTests(unittest.TestCase):
     def test_all_generated_styles_are_at_least_ten_points(self) -> None:
@@ -313,6 +323,49 @@ class PipelineTests(unittest.TestCase):
                     colors = [element.get("textColor") for element in xml.iter() if element.get("textColor")]
                     self.assertTrue(colors)
                     self.assertEqual(set(colors), {"#000000"})
+
+
+class P01Tests(unittest.TestCase):
+    def test_tabs_indents_bullets_and_numbering_are_semantic_hwpml(self) -> None:
+        spec = {
+            "metadata": {"title": "P01", "author": "Codex"},
+            "blocks": [
+                {"type": "paragraph", "tabs": [{"position": 2400, "type": "LEFT"}], "indent": {"left": 1200, "first_line": -600}, "text": "Tabbed\tbody"},
+                {"type": "paragraph", "bullet": {"level": 2, "char": "▪"}, "text": "Bullet item"},
+                {"type": "paragraph", "numbering": {"level": 1, "start": 1, "format": "DIGIT"}, "text": "Number item"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+            result = build_document(spec_path, output)
+            self.assertEqual(result["validation"], "passed")
+            self.assertTrue(validate_document(output)["valid"])
+            inspected = inspect_document(output)
+            self.assertEqual(inspected["numberings"], 1)
+            self.assertEqual(inspected["bullets"], 1)
+            self.assertEqual(inspected["tab_stops"], 1)
+            with ZipFile(output) as archive:
+                header = ET.fromstring(archive.read("Contents/header.xml"))
+                section = ET.fromstring(archive.read("Contents/section0.xml"))
+                local = lambda element: element.tag.rsplit("}", 1)[-1]
+                numbering = next(element for element in header.iter() if local(element) == "numbering")
+                self.assertEqual(len([element for element in numbering if local(element) == "paraHead"]), 10)
+                self.assertEqual(next(element for element in header.iter() if local(element) == "bullet").get("char"), "▪")
+                tabs = [element for element in header.iter() if local(element) == "tabItem"]
+                self.assertEqual(tabs[0].get("pos"), "2400")
+                self.assertEqual(len([element for element in section.iter() if local(element) == "tab"]), 1)
+                dynamic = [element for element in header.iter() if local(element) == "paraPr" and element.get("id") not in {str(index) for index in range(len(STYLE_SPECS))}]
+                self.assertEqual(len(dynamic), 3)
+                self.assertTrue(any(element.find("{*}heading").get("type") == "BULLET" for element in dynamic))
+                self.assertTrue(any(element.find("{*}heading").get("type") == "NUMBER" for element in dynamic))
+                paragraphs = [element for element in section.iter() if local(element) == "p"]
+                text = "".join(element.text or "" for element in section.iter() if local(element) == "t")
+                self.assertEqual(text, "TabbedbodyBullet itemNumber item")
+                self.assertNotIn("• Bullet", text)
+                self.assertTrue(all(element.get("paraPrIDRef") != "0" for element in paragraphs[:3]))
 
 
 class TemplateTests(unittest.TestCase):
