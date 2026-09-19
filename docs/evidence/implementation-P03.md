@@ -2,7 +2,7 @@
 
 Status: `CANDIDATE`
 
-Final candidate feature commit: `PENDING_COMMIT_SHA`
+Final candidate feature commit: `7e056ca` (`git rev-parse HEAD` at feature commit)
 
 Scope: public Document Spec support for native table cell spans, safe table split modes, table/cell shading, and the extended safe formula grammar. The central feature-verification checklist was not edited.
 
