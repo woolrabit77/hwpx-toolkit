@@ -2,7 +2,7 @@
 
 Status: `CANDIDATE`
 
-Final candidate feature commit: `7e056ca` (`git rev-parse HEAD` at feature commit)
+Final candidate feature commit: `639a693` (`git rev-parse HEAD` at feature commit)
 
 Scope: public Document Spec support for native table cell spans, safe table split modes, table/cell shading, and the extended safe formula grammar. The central feature-verification checklist was not edited.
 
@@ -34,7 +34,7 @@ Results:
 - Full suite: `33 tests`, `OK`.
 - Fixture build: passed; output validation: passed.
 - Fixture `validate`: `valid: true`, no errors.
-- Fixture `inspect`: `tables: 1`, `fields: 1`, `sections: 1`.
+- Fixture `inspect`: `tables: 1`, `fields: 1`, `sections: 1`, `paragraphs: 11`.
 - Package checker: `HWPX package validation passed.`
 - Formula-failure fixture: rejected with `Unsupported table formula function: UNKNOWN`, exit code `2`, and no output file.
 - Determinism: rebuilding the fixture produced the same SHA-256.
@@ -43,7 +43,7 @@ Results:
 
 `tests/fixtures/p03-table-semantics.hwpx` SHA-256:
 
-`67D81575C37F6E200928267936A29FFEC9AF1B995A6CFD992FEEF1D0F119D86F`
+`DBF82FC290F1BC08D5D2235BB2C0AED628EE70D74CA6F0868A8F3DCA46CA3DE1`
 
 ## Known limits
 
