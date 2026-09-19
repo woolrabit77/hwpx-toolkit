@@ -74,21 +74,46 @@ def q(namespace: str, name: str) -> str:
     return f"{{{namespace}}}{name}"
 
 
+def _border_profile(border_style: str) -> tuple[str, str]:
+    if border_style in {"none", "plain"}:
+        return "NONE", "#000000"
+    if border_style == "subtle":
+        return "SOLID", "#808080"
+    return "SOLID", "#000000"
+
+
+def _shading_ids(document: Document) -> dict[tuple[str, str], int]:
+    keys: set[tuple[str, str]] = set()
+    sections = document.sections or [Section(blocks=document.blocks, metadata=document.metadata)]
+    for section_model in sections:
+        for block in section_model.blocks:
+            if not isinstance(block, Table):
+                continue
+            if block.shading:
+                keys.add((block.shading, block.border_style))
+            for row in block.rows:
+                for cell in row:
+                    if cell.shading:
+                        keys.add((cell.shading, block.border_style))
+    return {key: index for index, key in enumerate(sorted(keys), start=3)}
+
+
 def serialize_document(document: Document, registry: IdRegistry) -> dict[str, bytes]:
     images = _collect_images(document)
     image_ids = {id(image): f"image{index}" for index, image in enumerate(images, start=1)}
+    shading_ids = _shading_ids(document)
     paragraph_profiles = _paragraph_profiles(document)
     sections = document.sections or [Section(blocks=document.blocks, metadata=document.metadata)]
     section_parts: dict[str, bytes] = {}
     previews: list[str] = []
     for index, section_model in enumerate(sections):
-        section, preview = _section(document, section_model, registry, image_ids, paragraph_profiles)
+        section, preview = _section(document, section_model, registry, image_ids, paragraph_profiles, shading_ids)
         section_parts[f"Contents/section{index}.xml"] = _xml_bytes(section)
         previews.append(preview)
     parts = {
         "version.xml": _version_xml(),
         "settings.xml": _xml_bytes(_settings()),
-        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles, len(sections))),
+        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles, shading_ids)),
         "Contents/content.hpf": _xml_bytes(_content(document, images, len(sections))),
         "META-INF/container.xml": _container_xml(),
         "META-INF/manifest.xml": _xml_bytes(_odf_manifest(images)),
@@ -101,7 +126,10 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
     return parts
 
 
-def _header(paragraph_profiles: list[dict[str, object]] | None = None, section_count: int = 1) -> ET.Element:
+def _header(
+    paragraph_profiles: list[dict[str, object]] | None = None,
+    shading_ids: dict[tuple[str, str], int] | None = None,
+) -> ET.Element:
     _validate_style_specs()
     paragraph_profiles = paragraph_profiles or []
     numbering_profiles: dict[tuple[str, int], int] = {}
@@ -135,12 +163,25 @@ def _header(paragraph_profiles: list[dict[str, object]] | None = None, section_c
         fontface = ET.SubElement(fontfaces, q(HH, "fontface"), {"lang": language, "fontCnt": "2"})
         ET.SubElement(fontface, q(HH, "font"), {"id": "0", "face": "함초롬바탕", "type": "TTF", "isEmbedded": "0"})
         ET.SubElement(fontface, q(HH, "font"), {"id": "1", "face": "함초롬돋움", "type": "TTF", "isEmbedded": "0"})
-    border_fills = ET.SubElement(ref_list, q(HH, "borderFills"), {"itemCnt": "3"})
+    shading_ids = shading_ids or {}
+    border_fills = ET.SubElement(ref_list, q(HH, "borderFills"), {"itemCnt": str(3 + len(shading_ids))})
     for border_id, border_type, color in ((0, "NONE", "#000000"), (1, "SOLID", "#000000"), (2, "SOLID", "#808080")):
         border_fill = ET.SubElement(border_fills, q(HH, "borderFill"), {"id": str(border_id), "threeD": "0", "shadow": "0", "centerLine": "NONE", "breakCellSeparateLine": "0"})
         for edge in ("leftBorder", "rightBorder", "topBorder", "bottomBorder", "diagonal"):
             edge_type = "NONE" if edge == "diagonal" else border_type
             ET.SubElement(border_fill, q(HH, edge), {"type": edge_type, "width": "0.1 mm", "color": color})
+    for (color, border_style), border_id in sorted(shading_ids.items(), key=lambda item: item[1]):
+        border_type, border_color = _border_profile(border_style)
+        border_fill = ET.SubElement(
+            border_fills,
+            q(HH, "borderFill"),
+            {"id": str(border_id), "threeD": "0", "shadow": "0", "centerLine": "NONE", "breakCellSeparateLine": "0"},
+        )
+        for edge in ("leftBorder", "rightBorder", "topBorder", "bottomBorder", "diagonal"):
+            edge_type = "NONE" if edge == "diagonal" else border_type
+            ET.SubElement(border_fill, q(HH, edge), {"type": edge_type, "width": "0.1 mm", "color": border_color})
+        fill_brush = ET.SubElement(border_fill, q(HC, "fillBrush"))
+        ET.SubElement(fill_brush, q(HC, "winBrush"), {"faceColor": color, "hatchColor": "#000000", "alpha": "0"})
     char_properties = ET.SubElement(ref_list, q(HH, "charProperties"), {"itemCnt": str(len(STYLE_SPECS))})
     all_hundred = {language.lower(): "100" for language in languages}
     all_zero_spacing = {language.lower(): "0" for language in languages}
@@ -356,6 +397,7 @@ def _section(
     registry: IdRegistry,
     image_ids: dict[int, str],
     paragraph_profiles: list[dict[str, object]] | None = None,
+    shading_ids: dict[tuple[str, str], int] | None = None,
 ) -> tuple[ET.Element, str]:
     root = ET.Element(q(HS, "sec"))
     preview: list[str] = []
@@ -378,7 +420,7 @@ def _section(
             _write_page_break(root, paragraph_id, section_model.metadata or document.metadata, section_start=first_block, section=section_model, registry=registry)
             paragraph_id += 1
         elif isinstance(block, Table):
-            _write_table(root, block, registry, paragraph_id, section_model.metadata or document.metadata, image_ids, section_start=first_block, section=section_model)
+            _write_table(root, block, registry, paragraph_id, section_model.metadata or document.metadata, image_ids, shading_ids or {}, section_start=first_block, section=section_model)
             if block.caption:
                 preview.append(block.caption)
             for row in block.rows:
@@ -507,6 +549,7 @@ def _write_table(
     paragraph_id: int,
     metadata: dict[str, object],
     image_ids: dict[int, str],
+    shading_ids: dict[tuple[str, str], int],
     *,
     section_start: bool = False,
     section: Section | None = None,
@@ -519,7 +562,7 @@ def _write_table(
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
         ET.SubElement(ctrl, q(HP, "bookmark"), {"name": table.bookmark})
     row_count = len(table.rows)
-    col_count = max(len(row) for row in table.rows)
+    col_count = table.col_count or max((cell.col_index + cell.col_span for row in table.rows for cell in row), default=1)
     table_width = _content_width(metadata)
     if _column_count(metadata) > 1:
         table_width = max(1000, (table_width - _column_gap(metadata)) // _column_count(metadata))
@@ -534,7 +577,7 @@ def _write_table(
     tbl = ET.SubElement(
         run,
         q(HP, "tbl"),
-        {"id": str(registry.allocate("table") + 3000), "zOrder": "0", "numberingType": "TABLE", "textWrap": "TOP_AND_BOTTOM", "textFlow": "BOTH_SIDES", "lock": "0", "pageBreak": "CELL", "repeatHeader": "1" if table.header_rows else "0", "rowCnt": str(row_count), "colCnt": str(col_count), "cellSpacing": "0", "borderFillIDRef": str(border_fill_id), "noAdjust": "0"},
+        {"id": str(registry.allocate("table") + 3000), "zOrder": "0", "numberingType": "TABLE", "textWrap": "TOP_AND_BOTTOM", "textFlow": "BOTH_SIDES", "lock": "0", "pageBreak": table.split.upper(), "repeatHeader": "1" if table.repeat_header and table.header_rows else "0", "rowCnt": str(row_count), "colCnt": str(col_count), "cellSpacing": "0", "borderFillIDRef": str(border_fill_id), "noAdjust": "0"},
     )
     row_heights = [_mm(value) for value in table.row_heights_mm] if table.row_heights_mm else [2400] * row_count
     ET.SubElement(tbl, q(HP, "sz"), {"width": str(table_width), "widthRelTo": "ABSOLUTE", "height": str(sum(row_heights)), "heightRelTo": "ABSOLUTE", "protect": "0"})
@@ -551,23 +594,26 @@ def _write_table(
     for row_index, row_model in enumerate(table.rows):
         tr = ET.SubElement(tbl, q(HP, "tr"))
         row_height = row_heights[row_index]
-        for col_index, cell_model in enumerate(row_model):
-            tc = ET.SubElement(tr, q(HP, "tc"), {"name": "", "header": "1" if row_index < table.header_rows else "0", "hasMargin": "1", "protect": "0", "editable": "0", "dirty": "0", "borderFillIDRef": str(border_fill_id)})
+        for cell_model in row_model:
+            col_index = cell_model.col_index
+            cell_border_fill = shading_ids.get((cell_model.shading or table.shading, table.border_style), border_fill_id) if (cell_model.shading or table.shading) else border_fill_id
+            tc = ET.SubElement(tr, q(HP, "tc"), {"name": "", "header": "1" if row_index < table.header_rows else "0", "hasMargin": "1", "protect": "0", "editable": "0", "dirty": "0", "borderFillIDRef": str(cell_border_fill)})
             ET.SubElement(tc, q(HP, "cellAddr"), {"colAddr": str(col_index), "rowAddr": str(row_index)})
-            ET.SubElement(tc, q(HP, "cellSpan"), {"colSpan": "1", "rowSpan": "1"})
-            cell_width = cell_widths[col_index]
+            ET.SubElement(tc, q(HP, "cellSpan"), {"colSpan": str(cell_model.col_span), "rowSpan": str(cell_model.row_span)})
+            cell_width = sum(cell_widths[col_index:col_index + cell_model.col_span])
+            cell_height = sum(row_heights[row_index:row_index + cell_model.row_span])
             cell_style = cell_model.style
             if cell_style == "table-cell" and row_index < table.header_rows:
                 cell_style = "table-header"
             cell_style_id = _style_id(cell_style)
-            ET.SubElement(tc, q(HP, "cellSz"), {"width": str(cell_width), "height": str(row_height)})
+            ET.SubElement(tc, q(HP, "cellSz"), {"width": str(cell_width), "height": str(cell_height)})
             ET.SubElement(tc, q(HP, "cellMargin"), {"left": "141", "right": "141", "top": "141", "bottom": "141"})
-            sub = ET.SubElement(tc, q(HP, "subList"), {"id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK", "vertAlign": "CENTER", "linkListIDRef": "0", "linkListNextIDRef": "0", "textWidth": str(cell_width), "textHeight": str(row_height), "hasTextRef": "0", "hasNumRef": "0"})
+            sub = ET.SubElement(tc, q(HP, "subList"), {"id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK", "vertAlign": "CENTER", "linkListIDRef": "0", "linkListNextIDRef": "0", "textWidth": str(cell_width), "textHeight": str(cell_height), "hasTextRef": "0", "hasNumRef": "0"})
             cp = _new_paragraph(sub, registry.allocate("cell_para") + 6000, cell_style_id)
             cp.set("paraPrIDRef", str(cell_style_id))
             cr = ET.SubElement(cp, q(HP, "run"), {"charPrIDRef": str(cell_style_id)})
             if cell_model.image:
-                _write_picture(cr, cell_model.image, image_ids[id(cell_model.image)], registry, cell_width, row_height)
+                _write_picture(cr, cell_model.image, image_ids[id(cell_model.image)], registry, cell_width, cell_height)
                 if cell_model.value:
                     _write_text(cr, cell_model.value)
                 else:

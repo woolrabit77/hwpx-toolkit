@@ -83,7 +83,29 @@ Use `sections` when a document needs independent page layout or semantic running
 - `paragraph`: `text` or `runs`; optional `style`, `bookmark`, and `index_terms`
 - `heading`: `level` from 1 to 9, text, and optional bookmark
 - `equation`: editable HWP equation `script`; box size is automatic
-- `table`: rectangular rows, optional caption, bookmark, column widths, row heights in millimetres, header-row count, formulas, images, and border style. Omit `border_style` to use visible black `grid` borders.
+- `table`: logical rows with semantic cell spans, optional caption, bookmark, column widths, row heights in millimetres, header-row count, formulas, images, shading, and border style. Omit `border_style` to use visible black `grid` borders. Logical columns are inferred from the span-aware grid; `column_widths` must match that inferred count.
+
+### Table semantics
+
+Cell spans are real HWPML `hp:cellSpan` values. A cell consumes the next available grid slot in its row; a row-spanning cell occupies the same columns in following rows. The canonical form is `{"span": {"rows": 2, "cols": 2}}` (the equivalent `row_span`/`col_span` fields are accepted). Covered cells are omitted from the row rather than faked with text. Overlaps, spans outside the table, and ambiguous span declarations fail with `SpecError`.
+
+```json
+{
+  "type": "table",
+  "header_rows": 1,
+  "shading": "#EAF2F8",
+  "split": "cell",
+  "rows": [
+    [{"value": "Merged heading", "span": {"cols": 2}}, "Amount"],
+    [{"value": "A", "shading": "#FFF2CC"}, 10, 20],
+    ["Total", {"formula": "SUM(B2:C2)"}]
+  ]
+}
+```
+
+`shading` is a six-digit `#RRGGBB` color on a table or cell and is emitted through native HWP border-fill brushes; it is not text or an image. `split` is one of `cell` (default), `table`, or `none`, mapping to HWPML `pageBreak="CELL|TABLE|NONE"`; unknown modes fail closed. `repeat_header` is an explicit boolean and defaults to true when `header_rows` is non-zero.
+
+Formulas are evaluated deterministically before serialization. The safe grammar supports `SUM`, `AVERAGE`, `PRODUCT`, `MIN`, and `MAX`, rectangular ranges, comma-separated arguments, cell references, numeric constants, parentheses, and `+ - * /`. Formula cells may reference earlier formula cells. Unknown functions, malformed ranges, circular references, text cells, empty direct references, and division by zero fail closed.
 - `footnote`, `endnote`: non-empty note text
 - `toc`: linked entries for selected heading levels; static page numbers are not generated
 - `index`: sorted unique terms

@@ -49,6 +49,11 @@ class TableCell:
     formula: str | None = None
     style: str = "table-cell"
     image: ImageAsset | None = None
+    row_span: int = 1
+    col_span: int = 1
+    row_index: int = 0
+    col_index: int = 0
+    shading: str | None = None
 
 
 @dataclass
@@ -60,6 +65,10 @@ class Table:
     header_rows: int = 1
     border_style: str = "grid"
     row_heights_mm: list[float] = field(default_factory=list)
+    shading: str | None = None
+    split: str = "cell"
+    repeat_header: bool = True
+    col_count: int = 0
 
 
 @dataclass

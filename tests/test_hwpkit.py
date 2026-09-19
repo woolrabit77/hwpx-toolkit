@@ -35,6 +35,18 @@ class FormulaTests(unittest.TestCase):
         rows = [["Item", "Amount"], ["A", 100], ["B", 200]]
         self.assertEqual(evaluate_formula("SUM(B2:B3)", rows), 300)
 
+    def test_extended_safe_formula_grammar(self) -> None:
+        rows = [["Item", 10, 20], ["Total", {"formula": "SUM(B1:C1) * 2"}, 5]]
+        self.assertEqual(evaluate_formula("B2+C2", rows), 65)
+
+    def test_unsafe_or_ambiguous_formula_fails_closed(self) -> None:
+        with self.assertRaisesRegex(SpecError, "Unsupported table formula"):
+            evaluate_formula("__import__('os').system('x')", [[1]])
+        with self.assertRaisesRegex(SpecError, "division by zero"):
+            evaluate_formula("1/0", [[1]])
+        with self.assertRaisesRegex(SpecError, "covered cell"):
+            evaluate_formula("SUM(A1:B1)", [[{"value": 1}, {"covered": True}]])
+
 
 class SpecTests(unittest.TestCase):
     def test_locked_feature_fails_closed(self) -> None:
@@ -74,6 +86,31 @@ class SpecTests(unittest.TestCase):
         for invalid in invalid_specs:
             with self.subTest(spec=invalid), self.assertRaisesRegex(SpecError, "JSON integer"):
                 parse_document_spec(invalid)
+
+    def test_p03_places_real_spans_and_rejects_overlap(self) -> None:
+        document, _ = parse_document_spec({
+            "blocks": [{
+                "type": "table",
+                "rows": [[{"value": "A", "span": {"rows": 2, "cols": 2}}, "B"], ["C"]],
+            }]
+        })
+        table = document.blocks[0]
+        self.assertEqual(table.col_count, 3)
+        self.assertEqual((table.rows[0][0].row_span, table.rows[0][0].col_span), (2, 2))
+        self.assertEqual((table.rows[1][0].row_index, table.rows[1][0].col_index), (1, 2))
+        with self.assertRaisesRegex(SpecError, "outside the table"):
+            parse_document_spec({"blocks": [{"type": "table", "rows": [[{"value": "A", "span": {"rows": 2}}]]}]})
+
+    def test_p03_rejects_ambiguous_shading_and_split(self) -> None:
+        with self.assertRaisesRegex(SpecError, "six-digit"):
+            parse_document_spec({"blocks": [{"type": "table", "shading": "yellow", "rows": [["A"]]}]})
+        with self.assertRaisesRegex(SpecError, "split"):
+            parse_document_spec({"blocks": [{"type": "table", "split": "page", "rows": [["A"]]}]})
+
+    def test_p03_formula_failure_fixture_is_rejected(self) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "p03-table-formula-failure.json"
+        with self.assertRaisesRegex(SpecError, "Unsupported table formula function"):
+            parse_document_spec(json.loads(fixture.read_text(encoding="utf-8")))
 
 
 class PipelineTests(unittest.TestCase):
@@ -335,6 +372,42 @@ class PipelineTests(unittest.TestCase):
                     colors = [element.get("textColor") for element in xml.iter() if element.get("textColor")]
                     self.assertTrue(colors)
                     self.assertEqual(set(colors), {"#000000"})
+
+    def test_p03_spans_shading_and_split_are_native_hwpml(self) -> None:
+        spec = {
+            "metadata": {"title": "P03", "author": "Codex"},
+            "blocks": [{
+                "type": "table",
+                "header_rows": 1,
+                "shading": "#EAF2F8",
+                "split": "none",
+                "rows": [
+                    [{"value": "Merged", "span": {"rows": 2, "cols": 2}}, {"value": "Value", "shading": "#FFF2CC"}],
+                    ["Detail"],
+                    ["A", 10, 20],
+                    ["Total", {"formula": "SUM(B3:C3)+5"}],
+                ],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+            build_document(spec_path, output)
+            self.assertTrue(validate_document(output)["valid"])
+            with ZipFile(output) as archive:
+                header = ET.fromstring(archive.read("Contents/header.xml"))
+                section = ET.fromstring(archive.read("Contents/section0.xml"))
+                border_fills = [element for element in header.iter() if element.tag.rsplit("}", 1)[-1] == "borderFill"]
+                self.assertTrue(any((brush := element.find(".//{*}winBrush")) is not None and brush.get("faceColor") == "#EAF2F8" for element in border_fills))
+                self.assertTrue(any((brush := element.find(".//{*}winBrush")) is not None and brush.get("faceColor") == "#FFF2CC" for element in border_fills))
+                table = next(element for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "tbl")
+                self.assertEqual(table.get("pageBreak"), "NONE")
+                spans = [element.find("{*}cellSpan") for element in table.iter() if element.tag.rsplit("}", 1)[-1] == "tc"]
+                self.assertIn({"colSpan": "2", "rowSpan": "2"}, [span.attrib for span in spans])
+                text = "".join(element.text or "" for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "t")
+                self.assertIn("35", text)
 
 
 class P01Tests(unittest.TestCase):

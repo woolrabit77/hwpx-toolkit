@@ -2,7 +2,7 @@
 
 | No. | Feature | Status | Safe scope | Unlock condition |
 |---:|---|---|---|---|
-| 21 | Table calculations | beta | `SUM`, `AVERAGE`, `PRODUCT`, `MIN`, and `MAX` over rectangular cells | broader formula grammar and recalculation fixtures |
+| 21 | Table calculations | beta | Safe aggregate/arithmetic grammar over rectangular cells with dependency and cycle checks | renderer-backed recalculation fixtures and broader spreadsheet semantics |
 | 26 | Charts | locked | detection and explicit failure only | chart parts, relationships, rendering, and round-trip fixtures |
 | 29 | Notes | experimental | footnotes and endnotes with stable numbering | multi-section continuation fixtures |
 | 30 | Captions | experimental | table caption sublists | automatic figure/equation numbering fixtures |

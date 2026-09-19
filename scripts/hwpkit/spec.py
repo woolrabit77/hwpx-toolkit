@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from struct import unpack
 from typing import Any
 from urllib.parse import urlparse
@@ -16,6 +17,7 @@ from .templates import apply_template
 
 ALLOWED_SCHEMES = {"http", "https", "mailto"}
 TABLE_BORDER_STYLES = {"none", "plain", "subtle", "grid", "form"}
+TABLE_SPLIT_MODES = {"cell", "table", "none"}
 TAB_TYPES = {"LEFT", "CENTER", "RIGHT", "DECIMAL"}
 TAB_LEADERS = {"NONE", "SOLID", "DOTTED", "DASHED"}
 NUMBER_FORMATS = {
@@ -409,22 +411,24 @@ def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Tabl
         raise SpecError("table.rows must be a non-empty array.")
     if not all(isinstance(row, list) and row for row in rows):
         raise SpecError("Every table row must be a non-empty array.")
-    width = len(rows[0])
-    if any(len(row) != width for row in rows):
-        raise SpecError("All table rows must have the same number of columns.")
-    column_widths = block.get("column_widths") or []
-    if column_widths:
-        if not isinstance(column_widths, list) or len(column_widths) != width:
-            raise SpecError("table.column_widths must match the table column count.")
-        if any(not isinstance(value, int) or value <= 0 for value in column_widths):
-            raise SpecError("table.column_widths values must be positive integers.")
-    header_rows = int(block.get("header_rows", 1))
+    header_rows = _strict_int(block.get("header_rows", 1), "table.header_rows")
     if header_rows < 0 or header_rows > len(rows):
         raise SpecError("table.header_rows is outside the valid row range.")
     border_style = str(block.get("border_style", "grid"))
     if border_style not in TABLE_BORDER_STYLES:
         allowed = ", ".join(sorted(TABLE_BORDER_STYLES))
         raise SpecError(f"table.border_style must be one of: {allowed}")
+    if "split" in block and "page_break" in block and block["split"] != block["page_break"]:
+        raise SpecError("Conflicting table split declarations.")
+    split = str(block.get("split", block.get("page_break", "cell"))).lower()
+    if split not in TABLE_SPLIT_MODES:
+        raise SpecError("table.split must be one of: cell, table, none")
+    repeat_header = block.get("repeat_header", True)
+    if not isinstance(repeat_header, bool):
+        raise SpecError("table.repeat_header must be a JSON boolean.")
+    if "shading" in block and "fill_color" in block and block["shading"] != block["fill_color"]:
+        raise SpecError("Conflicting table shading declarations.")
+    table_shading = _parse_color(block.get("shading", block.get("fill_color")), "table.shading")
     row_heights_raw = block.get("row_heights_mm") or []
     if row_heights_raw:
         if not isinstance(row_heights_raw, list) or len(row_heights_raw) != len(rows):
@@ -437,43 +441,137 @@ def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Tabl
             raise SpecError("table.row_heights_mm values must be positive numbers.")
     else:
         row_heights_mm = []
-    parsed: list[list[TableCell]] = []
-    for row in rows:
+    occupancy: dict[tuple[int, int], TableCell] = {}
+    origins: list[list[TableCell]] = []
+    formula_rows: list[list[object]] = [[None] * 1 for _ in rows]
+    max_col = 0
+    for row_index, row in enumerate(rows):
         parsed_row: list[TableCell] = []
+        cursor = 0
+        for source_index, raw_cell in enumerate(row):
+            while (row_index, cursor) in occupancy:
+                cursor += 1
+            cell = _parse_table_cell(raw_cell, base_dir=base_dir)
+            cell.row_index = row_index
+            cell.col_index = cursor
+            if row_index + cell.row_span > len(rows):
+                raise SpecError(f"table cell at row {row_index + 1} has a row span outside the table.")
+            for covered_row in range(row_index, row_index + cell.row_span):
+                for covered_col in range(cursor, cursor + cell.col_span):
+                    if (covered_row, covered_col) in occupancy:
+                        raise SpecError(f"table cell at row {row_index + 1} overlaps another cell.")
+                    occupancy[(covered_row, covered_col)] = cell
+            parsed_row.append(cell)
+            cursor += cell.col_span
+            max_col = max(max_col, cursor)
+        if not parsed_row:
+            raise SpecError(f"table row {row_index + 1} must contain an unmerged cell.")
+        origins.append(parsed_row)
+    for row_index in range(len(rows)):
+        formula_rows[row_index] = [{"covered": True}] * max_col
+    for (row_index, col_index), cell in occupancy.items():
+        if (row_index, col_index) == (cell.row_index, cell.col_index):
+            formula_rows[row_index][col_index] = {
+                "value": cell.value,
+                "formula": cell.formula,
+            } if cell.formula else cell.value
+    for row in origins:
         for cell in row:
-            if isinstance(cell, dict) and cell.get("image"):
-                image_raw = cell["image"]
-                if isinstance(image_raw, dict) and not str(image_raw.get("path", "")).strip():
-                    parsed_row.append(
-                        TableCell(value=str(cell.get("value", "")), style=str(cell.get("style", "table-cell")))
-                    )
-                    continue
-                parsed_row.append(
-                    TableCell(
-                        value=str(cell.get("value", "")),
-                        style=str(cell.get("style", "table-cell")),
-                        image=_parse_image(image_raw, base_dir=base_dir),
-                    )
-                )
-            elif isinstance(cell, dict) and cell.get("formula"):
-                formula = str(cell["formula"])
-                result = evaluate_formula(formula, rows)
-                display = str(int(result)) if result.is_integer() else f"{result:.10g}"
-                parsed_row.append(TableCell(value=display, formula=formula, style=str(cell.get("style", "table-cell"))))
-            else:
-                value = cell.get("value", "") if isinstance(cell, dict) else cell
-                style = str(cell.get("style", "table-cell")) if isinstance(cell, dict) else "table-cell"
-                parsed_row.append(TableCell(value=str(value), style=style))
-        parsed.append(parsed_row)
+            if cell.formula:
+                result = evaluate_formula(cell.formula, formula_rows)
+                cell.value = str(int(result)) if result.is_integer() else f"{result:.10g}"
+                formula_rows[cell.row_index][cell.col_index] = cell.value
+    column_widths = block.get("column_widths") or []
+    if column_widths:
+        if not isinstance(column_widths, list) or len(column_widths) != max_col:
+            raise SpecError("table.column_widths must match the logical table column count.")
+        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in column_widths):
+            raise SpecError("table.column_widths values must be positive integers.")
     return Table(
-        rows=parsed,
+        rows=origins,
         caption=str(block.get("caption")) if block.get("caption") else None,
         bookmark=str(block.get("bookmark")) if block.get("bookmark") else None,
         column_widths=list(column_widths),
         header_rows=header_rows,
         border_style=border_style,
         row_heights_mm=row_heights_mm,
+        shading=table_shading,
+        split=split,
+        repeat_header=repeat_header,
+        col_count=max_col,
     )
+
+
+def _parse_table_cell(raw_cell: object, *, base_dir: Path | None) -> TableCell:
+    if not isinstance(raw_cell, dict):
+        return TableCell(value=str(raw_cell))
+    if "formula" in raw_cell and raw_cell.get("formula") not in (None, "") and raw_cell.get("image"):
+        raise SpecError("A table cell cannot contain both formula and image.")
+    row_span, col_span = _parse_spans(raw_cell)
+    if "shading" in raw_cell and "fill_color" in raw_cell and raw_cell["shading"] != raw_cell["fill_color"]:
+        raise SpecError("Conflicting table cell shading declarations.")
+    shading = _parse_color(raw_cell.get("shading", raw_cell.get("fill_color")), "table cell shading")
+    image = None
+    if raw_cell.get("image"):
+        image_raw = raw_cell["image"]
+        if not (isinstance(image_raw, dict) and not str(image_raw.get("path", "")).strip()):
+            image = _parse_image(image_raw, base_dir=base_dir)
+    formula = raw_cell.get("formula")
+    if formula is not None:
+        if not isinstance(formula, str) or not formula.strip():
+            raise SpecError("table cell formula must be a non-empty string.")
+        value = str(raw_cell.get("value", ""))
+    else:
+        value = raw_cell.get("value", "")
+    return TableCell(
+        value=str(value),
+        formula=formula,
+        style=str(raw_cell.get("style", "table-cell")),
+        image=image,
+        row_span=row_span,
+        col_span=col_span,
+        shading=shading,
+    )
+
+
+def _parse_spans(cell: dict[str, Any]) -> tuple[int, int]:
+    span = cell.get("span")
+    merge = cell.get("merge")
+    if span is not None and merge is not None:
+        raise SpecError("A table cell may specify only one of span or merge.")
+    span = span if span is not None else merge
+    aliases = {"row_span": cell.get("row_span"), "col_span": cell.get("col_span")}
+    if span is not None:
+        if not isinstance(span, dict):
+            raise SpecError("table cell span must be an object with rows and cols.")
+        unknown = set(span) - {"rows", "cols", "row_span", "col_span"}
+        if unknown:
+            raise SpecError("table cell span contains unsupported keys.")
+        if "rows" in span and "row_span" in span and span["rows"] != span["row_span"]:
+            raise SpecError("Conflicting nested table cell row span declarations.")
+        if "cols" in span and "col_span" in span and span["cols"] != span["col_span"]:
+            raise SpecError("Conflicting nested table cell column span declarations.")
+        nested_row = span.get("rows", span.get("row_span"))
+        nested_col = span.get("cols", span.get("col_span"))
+        if aliases["row_span"] is not None and nested_row is not None and aliases["row_span"] != nested_row:
+            raise SpecError("Conflicting table cell row span declarations.")
+        if aliases["col_span"] is not None and nested_col is not None and aliases["col_span"] != nested_col:
+            raise SpecError("Conflicting table cell column span declarations.")
+        aliases["row_span"] = nested_row if nested_row is not None else aliases["row_span"]
+        aliases["col_span"] = nested_col if nested_col is not None else aliases["col_span"]
+    row_span = _strict_int(aliases["row_span"] if aliases["row_span"] is not None else 1, "table cell row span")
+    col_span = _strict_int(aliases["col_span"] if aliases["col_span"] is not None else 1, "table cell column span")
+    if row_span < 1 or col_span < 1:
+        raise SpecError("table cell spans must be positive JSON integers.")
+    return row_span, col_span
+
+
+def _parse_color(value: object, name: str) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
+        raise SpecError(f"{name} must be a six-digit hex color such as #D9EAF7.")
+    return value.upper()
 
 
 def _parse_image(raw: object, *, base_dir: Path | None) -> ImageAsset:

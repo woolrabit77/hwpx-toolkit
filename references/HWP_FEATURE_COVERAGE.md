@@ -18,10 +18,10 @@ This is a practical priority list, not measured usage telemetry. Hancom does not
 | 12 | Page setup and margins | Supported per template profile |
 | 13 | Headers, footers, page numbers | Supported for semantic text controls and editable `hp:pageNum` fields in each section |
 | 14 | Page, column, section breaks | Supported for explicit page-break paragraphs and independently packaged multi-section documents |
-| 15 | Tables | Supported for rectangular tables |
-| 16 | Merge and split cells | Not yet supported by the public spec |
-| 17 | Table borders and shading | Borders supported; shading limited |
-| 18 | Table formulas | Beta safe subset |
+| 15 | Tables | Supported for logical span-aware tables with deterministic grid placement |
+| 16 | Merge and split cells | Supported for non-overlapping native `hp:cellSpan` values; ambiguous grids fail closed |
+| 17 | Table borders and shading | Visible black grid defaults plus native table/cell `#RRGGBB` border-fill shading |
+| 18 | Table formulas | Beta safe grammar with aggregates, ranges, arithmetic, dependencies, and cycle checks |
 | 19 | Images | PNG/JPEG images embedded in table cells; floating images and image editing are not supported |
 | 20 | Shapes and text boxes | Not in the standalone writer |
 | 21 | Table calculations | Beta |

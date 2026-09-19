@@ -14,7 +14,7 @@ class Feature:
 
 
 FEATURES = {
-    "table_formula": Feature(21, "table_formula", "beta", "Evaluate a safe formula subset and write display values."),
+    "table_formula": Feature(21, "table_formula", "beta", "Evaluate a safe aggregate/arithmetic subset with ranges, dependencies, and cycle checks."),
     "chart": Feature(26, "chart", "locked", "Editable chart conformance fixtures are required."),
     "note": Feature(29, "note", "experimental", "Footnote and endnote structure with reference checks."),
     "caption": Feature(30, "caption", "experimental", "Target, numbering, and caption structure."),
