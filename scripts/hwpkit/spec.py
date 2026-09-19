@@ -181,10 +181,7 @@ def _parse_tabs(raw: object) -> list[dict[str, object]]:
     for index, value in enumerate(raw):
         if not isinstance(value, dict):
             raise SpecError(f"paragraph.tabs[{index}] must be an object.")
-        try:
-            position = int(value.get("position", value.get("pos", 0)))
-        except (TypeError, ValueError) as exc:
-            raise SpecError(f"paragraph.tabs[{index}].position must be a non-negative integer.") from exc
+        position = _strict_int(value.get("position", value.get("pos", 0)), f"paragraph.tabs[{index}].position")
         if position < 0 or position <= previous:
             raise SpecError("paragraph tab positions must be strictly increasing non-negative integers.")
         tab_type = str(value.get("type", "LEFT")).upper()
@@ -215,16 +212,10 @@ def _parse_indent(block: dict[str, Any]) -> dict[str, int]:
     for source, target in aliases.items():
         if source not in raw:
             continue
-        try:
-            parsed[target] = int(raw[source])
-        except (TypeError, ValueError) as exc:
-            raise SpecError(f"paragraph.indent.{source} must be an integer HWPUNIT value.") from exc
+        parsed[target] = _strict_int(raw[source], f"paragraph.indent.{source}")
     for source, target in (("indent_left", "left"), ("indent_right", "right"), ("first_line_indent", "first_line")):
         if source in block and target not in parsed:
-            try:
-                parsed[target] = int(block[source])
-            except (TypeError, ValueError) as exc:
-                raise SpecError(f"{source} must be an integer HWPUNIT value.") from exc
+            parsed[target] = _strict_int(block[source], source)
     return parsed
 
 
@@ -255,16 +246,10 @@ def _parse_list(block: dict[str, Any]) -> tuple[str | None, int, int, str, str]:
         kind = "numbering"
     if kind not in {"bullet", "numbering"}:
         raise SpecError("paragraph.list.type must be 'bullet' or 'numbering'.")
-    try:
-        level = int(config.get("level", 1))
-    except (TypeError, ValueError) as exc:
-        raise SpecError("List level must be an integer from 1 to 10.") from exc
+    level = _strict_int(config.get("level", 1), "List level")
     if level < 1 or level > 10:
         raise SpecError("List level must be between 1 and 10.")
-    try:
-        start = int(config.get("start", 1))
-    except (TypeError, ValueError) as exc:
-        raise SpecError("List start must be a positive integer.") from exc
+    start = _strict_int(config.get("start", 1), "List start")
     if start < 1:
         raise SpecError("List start must be a positive integer.")
     if kind == "bullet":
@@ -418,6 +403,12 @@ def _positive_float_or_none(value: object, name: str) -> float | None:
     if parsed <= 0:
         raise SpecError(f"{name} must be a positive number.")
     return parsed
+
+
+def _strict_int(value: object, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SpecError(f"{name} must be a JSON integer.")
+    return value
 
 
 def _validate_link(value: str, registry: IdRegistry) -> None:

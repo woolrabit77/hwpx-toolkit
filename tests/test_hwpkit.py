@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import base64
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -62,6 +64,16 @@ class SpecTests(unittest.TestCase):
     def test_p01_rejects_invalid_number_format(self) -> None:
         with self.assertRaisesRegex(SpecError, "Number format"):
             parse_document_spec({"blocks": [{"type": "paragraph", "numbering": {"format": "EMOJI"}, "text": "x"}]})
+
+    def test_p01_rejects_non_json_integer_fields(self) -> None:
+        invalid_specs = [
+            {"blocks": [{"type": "paragraph", "numbering": {"level": True}, "text": "x"}]},
+            {"blocks": [{"type": "paragraph", "tabs": [{"position": 1200.5}], "text": "x"}]},
+            {"blocks": [{"type": "paragraph", "indent": {"left": "1200"}, "text": "x"}]},
+        ]
+        for invalid in invalid_specs:
+            with self.subTest(spec=invalid), self.assertRaisesRegex(SpecError, "JSON integer"):
+                parse_document_spec(invalid)
 
 
 class PipelineTests(unittest.TestCase):
@@ -326,6 +338,28 @@ class PipelineTests(unittest.TestCase):
 
 
 class P01Tests(unittest.TestCase):
+    def test_cli_rejects_non_json_integer_and_leaves_no_output(self) -> None:
+        invalid_specs = [
+            {"blocks": [{"type": "paragraph", "numbering": {"level": True}, "text": "x"}]},
+            {"blocks": [{"type": "paragraph", "tabs": [{"position": 1200.5}], "text": "x"}]},
+        ]
+        tool = Path(__file__).resolve().parents[1] / "scripts" / "hwpx_tool.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, invalid in enumerate(invalid_specs):
+                spec_path = root / f"invalid-{index}.json"
+                output = root / f"invalid-{index}.hwpx"
+                spec_path.write_text(json.dumps(invalid), encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, str(tool), "build", str(spec_path), "-o", str(output)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("JSON integer", result.stderr)
+                self.assertFalse(output.exists())
+
     def test_tabs_indents_bullets_and_numbering_are_semantic_hwpml(self) -> None:
         spec = {
             "metadata": {"title": "P01", "author": "Codex"},
