@@ -451,6 +451,33 @@ class P02Tests(unittest.TestCase):
         with self.assertRaisesRegex(SpecError, "section_break"):
             parse_document_spec({"sections": [{"blocks": [{"type": "section_break"}]}]})
 
+    def test_p02_rejects_unknown_control_keys_and_cli_leaves_no_output(self) -> None:
+        invalid_specs = [
+            {"blocks": [{"type": "page_break", "text": "not allowed"}]},
+            {"blocks": [{"type": "section_break", "unexpected": True}]},
+            {"sections": [{"page_number": {"position": "BOTTOM_CENTER", "unknown": True}, "blocks": []}]},
+            {"sections": [{"header": {"text": "Header", "unknown": True}, "blocks": []}]},
+        ]
+        tool = Path(__file__).resolve().parents[1] / "scripts" / "hwpx_tool.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, invalid in enumerate(invalid_specs):
+                spec_path = root / f"invalid-{index}.json"
+                output = root / f"invalid-{index}.hwpx"
+                spec_path.write_text(json.dumps(invalid), encoding="utf-8")
+                with self.subTest(spec=invalid):
+                    with self.assertRaisesRegex(SpecError, "unsupported"):
+                        parse_document_spec(invalid)
+                    result = subprocess.run(
+                        [sys.executable, str(tool), "build", str(spec_path), "-o", str(output)],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn("unsupported", result.stderr)
+                    self.assertFalse(output.exists())
+
 
 class TemplateTests(unittest.TestCase):
     def test_template_data_populates_document_metadata(self) -> None:

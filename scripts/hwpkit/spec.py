@@ -29,6 +29,14 @@ NUMBER_FORMATS = {
 }
 PAGE_NUMBER_POSITIONS = {"TOP_LEFT", "TOP_CENTER", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_CENTER", "BOTTOM_RIGHT"}
 PAGE_NUMBER_FORMATS = {"DIGIT", "ROMAN_SMALL", "ROMAN_CAPITAL", "LATIN_SMALL", "LATIN_CAPITAL"}
+SECTION_KEYS = {"blocks", "header", "footer", "page_number", "pageNum", "metadata"}
+SECTION_BREAK_KEYS = {"type", "header", "footer", "page_number", "pageNum", "metadata"}
+PAGE_BREAK_KEYS = {"type"}
+PAGE_NUMBER_KEYS = {"position", "format", "formatType", "side_char", "sideChar", "start"}
+HEADER_PARAGRAPH_KEYS = {
+    "type", "text", "runs", "style", "bookmark", "index_terms", "tabs", "tab_stops", "indent",
+    "indent_left", "indent_right", "first_line_indent", "bullet", "numbering", "list", "level",
+}
 
 
 def parse_document_spec(raw: dict[str, Any], *, base_dir: Path | None = None) -> tuple[Document, IdRegistry]:
@@ -65,6 +73,7 @@ def parse_document_spec(raw: dict[str, Any], *, base_dir: Path | None = None) ->
     for section_index, section in enumerate(section_inputs):
         if not isinstance(section, dict) or not isinstance(section.get("blocks", []), list):
             raise SpecError(f"sections[{section_index}] must contain a blocks array.")
+        _reject_unknown_keys(section, SECTION_KEYS, f"sections[{section_index}]")
 
     registry = IdRegistry()
     headings: list[tuple[int, str, str]] = []
@@ -146,11 +155,14 @@ def _split_section_breaks(blocks: list[object]) -> list[dict[str, Any]]:
             sections[-1]["blocks"].append(value)
             continue
         block_type = str(value.get("type", "paragraph"))
+        if block_type == "page_break":
+            _reject_unknown_keys(value, PAGE_BREAK_KEYS, f"blocks[{index}]")
+            sections[-1]["blocks"].append(value)
+            continue
         if block_type != "section_break":
             sections[-1]["blocks"].append(value)
             continue
-        if any(key in value for key in ("text", "runs", "style")):
-            raise SpecError(f"blocks[{index}] section_break cannot contain paragraph content.")
+        _reject_unknown_keys(value, SECTION_BREAK_KEYS, f"blocks[{index}] section_break")
         next_section = {key: value[key] for key in ("header", "footer", "page_number", "pageNum", "metadata") if key in value}
         next_section["blocks"] = []
         sections.append(next_section)
@@ -160,6 +172,7 @@ def _split_section_breaks(blocks: list[object]) -> list[dict[str, Any]]:
 def _parse_block(block: dict[str, Any], registry: IdRegistry, headings: list[tuple[int, str, str]], *, base_dir: Path | None) -> object:
     block_type = str(block.get("type", "paragraph"))
     if block_type in {"page_break", "section_break"}:
+        _reject_unknown_keys(block, PAGE_BREAK_KEYS if block_type == "page_break" else SECTION_BREAK_KEYS, block_type)
         if block_type == "section_break":
             raise SpecError("section_break is only valid in the top-level blocks array.")
         return PageBreak()
@@ -197,9 +210,11 @@ def _parse_header_footer(raw: object, registry: IdRegistry, headings: list[tuple
         raw = [{"type": "paragraph", "text": raw}]
     elif isinstance(raw, dict):
         if "blocks" in raw:
+            _reject_unknown_keys(raw, {"blocks"}, name)
             raw = raw["blocks"]
         elif "text" in raw or "runs" in raw:
-            raw = [dict(raw, type="paragraph")]
+            _reject_unknown_keys(raw, HEADER_PARAGRAPH_KEYS, name)
+            raw = [dict(raw, type=str(raw.get("type", "paragraph")))]
         else:
             raise SpecError(f"{name} must contain text, runs, or blocks.")
     if not isinstance(raw, list):
@@ -210,6 +225,7 @@ def _parse_header_footer(raw: object, registry: IdRegistry, headings: list[tuple
             item = {"type": "paragraph", "text": item}
         if not isinstance(item, dict) or str(item.get("type", "paragraph")) not in {"paragraph", "heading"}:
             raise SpecError(f"{name}[{index}] supports only paragraph and heading blocks.")
+        _reject_unknown_keys(item, HEADER_PARAGRAPH_KEYS, f"{name}[{index}]")
         parsed = _parse_paragraph(item, registry, heading=str(item.get("type", "paragraph")) == "heading")
         result.append(parsed)
     return result
@@ -219,6 +235,11 @@ def _parse_page_number(raw: object, name: str) -> dict[str, str] | None:
     if raw in (None, False):
         return None
     config: dict[str, object] = {} if raw is True else raw if isinstance(raw, dict) else {"position": raw}
+    _reject_unknown_keys(config, PAGE_NUMBER_KEYS, name)
+    if "format" in config and "formatType" in config:
+        raise SpecError(f"{name} may specify only one of format or formatType.")
+    if "side_char" in config and "sideChar" in config:
+        raise SpecError(f"{name} may specify only one of side_char or sideChar.")
     position = str(config.get("position", "BOTTOM_CENTER")).upper()
     number_format = str(config.get("format", config.get("formatType", "DIGIT"))).upper()
     side_char = str(config.get("side_char", config.get("sideChar", "")))
@@ -235,6 +256,12 @@ def _parse_page_number(raw: object, name: str) -> dict[str, str] | None:
     if start is not None:
         result["start"] = str(start)
     return result
+
+
+def _reject_unknown_keys(value: dict[str, Any], allowed: set[str], name: str) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise SpecError(f"{name} contains unsupported key(s): {', '.join(unknown)}")
 
 
 def _parse_paragraph(block: dict[str, Any], registry: IdRegistry, *, heading: bool) -> Paragraph:
