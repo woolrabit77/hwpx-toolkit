@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "title": "P02",
+    "author": "Codex"
+  },
+  "sections": [
+    {
+      "header": {
+        "text": "First header"
+      },
+      "footer": {
+        "text": "First footer"
+      },
+      "page_number": {
+        "position": "BOTTOM_CENTER",
+        "side_char": "-",
+        "format": "DIGIT"
+      },
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "First section"
+        },
+        {
+          "type": "page_break"
+        },
+        {
+          "type": "paragraph",
+          "text": "After page break"
+        }
+      ]
+    },
+    {
+      "header": {
+        "text": "Second header"
+      },
+      "footer": {
+        "text": "Second footer"
+      },
+      "page_number": {
+        "position": "TOP_RIGHT",
+        "start": 3
+      },
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Second section"
+        }
+      ]
+    }
+  ]
+}

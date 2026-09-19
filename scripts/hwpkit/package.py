@@ -64,6 +64,10 @@ def write_package(parts: dict[str, bytes], output: Path) -> None:
 
 
 def _package_sort_key(name: str) -> tuple[int, str]:
+    if name.startswith("Contents/section") and name.endswith(".xml"):
+        suffix = name[len("Contents/section") : -len(".xml")]
+        if suffix.isdigit():
+            return 2, f"{int(suffix):08d}"
     order = {
         "version.xml": 0,
         "Contents/header.xml": 1,

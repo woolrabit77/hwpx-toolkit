@@ -69,9 +69,26 @@ class Note:
 
 
 @dataclass
+class PageBreak:
+    """A genuine paragraph-level page break, not a run of padding text."""
+
+    kind: str = "page"
+
+
+@dataclass
+class Section:
+    blocks: list[Any] = field(default_factory=list)
+    header: list[Paragraph] = field(default_factory=list)
+    footer: list[Paragraph] = field(default_factory=list)
+    page_number: dict[str, str] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class Document:
     title: str = ""
     author: str = ""
     blocks: list[Any] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     template_id: str | None = None
+    sections: list[Section] = field(default_factory=list)

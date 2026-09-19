@@ -402,6 +402,56 @@ class P01Tests(unittest.TestCase):
                 self.assertTrue(all(element.get("paraPrIDRef") != "0" for element in paragraphs[:3]))
 
 
+class P02Tests(unittest.TestCase):
+    def test_headers_footers_page_numbers_and_breaks_are_semantic(self) -> None:
+        spec = {
+            "metadata": {"title": "P02", "author": "Codex"},
+            "sections": [
+                {
+                    "header": "First header",
+                    "footer": {"text": "First footer"},
+                    "page_number": {"position": "BOTTOM_CENTER", "format": "DIGIT", "side_char": "-"},
+                    "blocks": [{"type": "paragraph", "text": "First"}, {"type": "page_break"}],
+                },
+                {
+                    "header": "Second header",
+                    "footer": "Second footer",
+                    "page_number": {"position": "TOP_RIGHT", "start": 3},
+                    "blocks": [{"type": "paragraph", "text": "Second"}],
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+            build_document(spec_path, output)
+            inspected = inspect_document(output)
+            self.assertEqual(inspected["sections"], 2)
+            self.assertEqual(inspected["headers"], 2)
+            self.assertEqual(inspected["footers"], 2)
+            self.assertEqual(inspected["page_numbers"], 2)
+            self.assertEqual(inspected["page_breaks"], 1)
+            self.assertTrue(validate_document(output)["valid"])
+            with ZipFile(output) as archive:
+                names = set(archive.namelist())
+                self.assertIn("Contents/section1.xml", names)
+                content = archive.read("Contents/content.hpf")
+                self.assertIn(b'href="Contents/section1.xml"', content)
+                section = ET.fromstring(archive.read("Contents/section1.xml"))
+                self.assertTrue(any(element.tag.rsplit("}", 1)[-1] == "pageNum" for element in section.iter()))
+                self.assertFalse(any((element.text or "").strip() in {"1", "2", "3"} for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "t"))
+
+    def test_p02_rejects_manual_or_unsupported_page_number_variants(self) -> None:
+        with self.assertRaisesRegex(SpecError, "position"):
+            parse_document_spec({"sections": [{"page_number": {"position": "CENTER"}, "blocks": []}]})
+        with self.assertRaisesRegex(SpecError, "page_number"):
+            parse_document_spec({"sections": [{"page_number": "1", "blocks": []}]})
+        with self.assertRaisesRegex(SpecError, "section_break"):
+            parse_document_spec({"sections": [{"blocks": [{"type": "section_break"}]}]})
+
+
 class TemplateTests(unittest.TestCase):
     def test_template_data_populates_document_metadata(self) -> None:
         spec = starter_spec("official-letter")

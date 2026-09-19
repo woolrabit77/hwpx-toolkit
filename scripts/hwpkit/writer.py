@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 from .equations import estimate_equation_box, normalize_equation
 from .ids import IdRegistry
 from .layouts import resolve_layout
-from .model import Document, ImageAsset, Note, Paragraph, Run, Table
+from .model import Document, ImageAsset, Note, PageBreak, Paragraph, Run, Section, Table
 
 
 HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -78,24 +78,30 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
     images = _collect_images(document)
     image_ids = {id(image): f"image{index}" for index, image in enumerate(images, start=1)}
     paragraph_profiles = _paragraph_profiles(document)
-    section, preview = _section(document, registry, image_ids, paragraph_profiles)
+    sections = document.sections or [Section(blocks=document.blocks, metadata=document.metadata)]
+    section_parts: dict[str, bytes] = {}
+    previews: list[str] = []
+    for index, section_model in enumerate(sections):
+        section, preview = _section(document, section_model, registry, image_ids, paragraph_profiles)
+        section_parts[f"Contents/section{index}.xml"] = _xml_bytes(section)
+        previews.append(preview)
     parts = {
         "version.xml": _version_xml(),
         "settings.xml": _xml_bytes(_settings()),
-        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles)),
-        "Contents/section0.xml": _xml_bytes(section),
-        "Contents/content.hpf": _xml_bytes(_content(document, images)),
+        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles, len(sections))),
+        "Contents/content.hpf": _xml_bytes(_content(document, images, len(sections))),
         "META-INF/container.xml": _container_xml(),
         "META-INF/manifest.xml": _xml_bytes(_odf_manifest(images)),
-        "META-INF/container.rdf": _container_rdf(),
-        "Preview/PrvText.txt": preview.encode("utf-8"),
+        "META-INF/container.rdf": _container_rdf(len(sections)),
+        "Preview/PrvText.txt": "\n".join(item for item in previews if item).encode("utf-8"),
     }
+    parts.update(section_parts)
     for index, image in enumerate(images, start=1):
         parts[f"BinData/image{index}.{image.extension}"] = image.data
     return parts
 
 
-def _header(paragraph_profiles: list[dict[str, object]] | None = None) -> ET.Element:
+def _header(paragraph_profiles: list[dict[str, object]] | None = None, section_count: int = 1) -> ET.Element:
     _validate_style_specs()
     paragraph_profiles = paragraph_profiles or []
     numbering_profiles: dict[tuple[str, int], int] = {}
@@ -116,7 +122,7 @@ def _header(paragraph_profiles: list[dict[str, object]] | None = None) -> ET.Ele
             if char not in bullet_profiles:
                 bullet_profiles[char] = len(bullet_profiles) + 1
             profile["list_id"] = bullet_profiles[char]
-    root = ET.Element(q(HH, "head"), {"version": "1.5", "secCnt": "1"})
+    root = ET.Element(q(HH, "head"), {"version": "1.5", "secCnt": str(section_count)})
     ET.SubElement(
         root,
         q(HH, "beginNum"),
@@ -218,14 +224,16 @@ def _paragraph_profiles(document: Document) -> list[dict[str, object]]:
     """Return deterministic dynamic paragraph properties for P01 formatting."""
     profiles: list[dict[str, object]] = []
     by_key: dict[tuple[object, ...], dict[str, object]] = {}
-    for block in document.blocks:
-        if not isinstance(block, Paragraph):
-            continue
-        if not block.tabs and not block.indent and not block.list_type:
-            continue
-        tabs = tuple((int(item["position"]), str(item["type"]), str(item["leader"])) for item in block.tabs)
-        indent = tuple(sorted((str(key), int(value)) for key, value in block.indent.items()))
-        key = (
+    source_sections = document.sections or [Section(blocks=document.blocks, metadata=document.metadata)]
+    for source_section in source_sections:
+      for block in source_section.blocks:
+          if not isinstance(block, Paragraph):
+              continue
+          if not block.tabs and not block.indent and not block.list_type:
+              continue
+          tabs = tuple((int(item["position"]), str(item["type"]), str(item["leader"])) for item in block.tabs)
+          indent = tuple(sorted((str(key), int(value)) for key, value in block.indent.items()))
+          key = (
             _style_id(block.style),
             tabs,
             indent,
@@ -234,10 +242,10 @@ def _paragraph_profiles(document: Document) -> list[dict[str, object]]:
             int(block.list_start),
             str(block.list_format),
             str(block.bullet_char),
-        )
-        profile = by_key.get(key)
-        if profile is None:
-            profile = {
+          )
+          profile = by_key.get(key)
+          if profile is None:
+              profile = {
                 "block_id": id(block),
                 "tabs": [dict(item) for item in block.tabs],
                 "indent": dict(block.indent),
@@ -247,16 +255,16 @@ def _paragraph_profiles(document: Document) -> list[dict[str, object]]:
                 "list_format": block.list_format,
                 "bullet_char": block.bullet_char,
                 "style_spec": STYLE_SPECS[_style_id(block.style)],
-            }
-            by_key[key] = profile
-            profiles.append(profile)
-        profile.setdefault("block_ids", []).append(id(block))
+              }
+              by_key[key] = profile
+              profiles.append(profile)
+          profile.setdefault("block_ids", []).append(id(block))
     for index, profile in enumerate(profiles, start=len(STYLE_SPECS)):
         profile["para_id"] = index
     return profiles
 
 
-def _content(document: Document, images: list[ImageAsset]) -> ET.Element:
+def _content(document: Document, images: list[ImageAsset], section_count: int = 1) -> ET.Element:
     root = ET.Element(q(OPF, "package"), {"version": "", "unique-identifier": "", "id": ""})
     metadata = ET.SubElement(root, q(OPF, "metadata"))
     ET.SubElement(metadata, q(OPF, "title")).text = document.title
@@ -265,13 +273,15 @@ def _content(document: Document, images: list[ImageAsset]) -> ET.Element:
     creator.text = document.author
     manifest = ET.SubElement(root, q(OPF, "manifest"))
     ET.SubElement(manifest, q(OPF, "item"), {"id": "header", "href": "Contents/header.xml", "media-type": "application/xml"})
-    ET.SubElement(manifest, q(OPF, "item"), {"id": "section0", "href": "Contents/section0.xml", "media-type": "application/xml"})
+    for index in range(section_count):
+        ET.SubElement(manifest, q(OPF, "item"), {"id": f"section{index}", "href": f"Contents/section{index}.xml", "media-type": "application/xml"})
     ET.SubElement(manifest, q(OPF, "item"), {"id": "settings", "href": "settings.xml", "media-type": "application/xml"})
     for index, image in enumerate(images, start=1):
         ET.SubElement(manifest, q(OPF, "item"), {"id": f"image{index}", "href": f"BinData/image{index}.{image.extension}", "media-type": image.media_type})
     spine = ET.SubElement(root, q(OPF, "spine"))
     ET.SubElement(spine, q(OPF, "itemref"), {"idref": "header", "linear": "yes"})
-    ET.SubElement(spine, q(OPF, "itemref"), {"idref": "section0", "linear": "yes"})
+    for index in range(section_count):
+        ET.SubElement(spine, q(OPF, "itemref"), {"idref": f"section{index}", "linear": "yes"})
     return root
 
 
@@ -309,7 +319,7 @@ def _settings() -> ET.Element:
     return root
 
 
-def _container_rdf() -> bytes:
+def _container_rdf(section_count: int = 1) -> bytes:
     """Emit the byte-stable RDF form accepted by Hancom Hangul.
 
     Hangul's package reader is stricter than a general RDF/XML parser. In
@@ -318,6 +328,11 @@ def _container_rdf() -> bytes:
     Keep the package namespace local to each ``hasPart`` element, matching
     native HWPX output.
     """
+    sections = "".join(
+        f'<rdf:Description rdf:about=""><ns0:hasPart xmlns:ns0="{PKG_META}" rdf:resource="Contents/section{index}.xml"/></rdf:Description>'
+        f'<rdf:Description rdf:about="Contents/section{index}.xml"><rdf:type rdf:resource="{PKG_META}SectionFile"/></rdf:Description>'
+        for index in range(section_count)
+    )
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
         f'<rdf:RDF xmlns:rdf="{RDF}">'
@@ -327,12 +342,7 @@ def _container_rdf() -> bytes:
         '<rdf:Description rdf:about="Contents/header.xml">'
         f'<rdf:type rdf:resource="{PKG_META}HeaderFile"/>'
         '</rdf:Description>'
-        '<rdf:Description rdf:about="">'
-        f'<ns0:hasPart xmlns:ns0="{PKG_META}" rdf:resource="Contents/section0.xml"/>'
-        '</rdf:Description>'
-        '<rdf:Description rdf:about="Contents/section0.xml">'
-        f'<rdf:type rdf:resource="{PKG_META}SectionFile"/>'
-        '</rdf:Description>'
+        + sections +
         '<rdf:Description rdf:about="">'
         f'<rdf:type rdf:resource="{PKG_META}Document"/>'
         '</rdf:Description>'
@@ -342,6 +352,7 @@ def _container_rdf() -> bytes:
 
 def _section(
     document: Document,
+    section_model: Section,
     registry: IdRegistry,
     image_ids: dict[int, str],
     paragraph_profiles: list[dict[str, object]] | None = None,
@@ -358,26 +369,29 @@ def _section(
         for block_id in profile.get("block_ids", [profile.get("block_id")])
         if block_id is not None
     }
-    for block in document.blocks:
+    for block in section_model.blocks:
         if isinstance(block, Paragraph):
-            _write_paragraph(root, block, registry, paragraph_id, document.metadata, section_start=first_block, para_pr_id=paragraph_ids.get(id(block)))
+            _write_paragraph(root, block, registry, paragraph_id, section_model.metadata or document.metadata, section_start=first_block, para_pr_id=paragraph_ids.get(id(block)), section=section_model)
             preview.extend(run.text for run in block.runs if run.text)
             paragraph_id += 1
+        elif isinstance(block, PageBreak):
+            _write_page_break(root, paragraph_id, section_model.metadata or document.metadata, section_start=first_block, section=section_model, registry=registry)
+            paragraph_id += 1
         elif isinstance(block, Table):
-            _write_table(root, block, registry, paragraph_id, document.metadata, image_ids, section_start=first_block)
+            _write_table(root, block, registry, paragraph_id, section_model.metadata or document.metadata, image_ids, section_start=first_block, section=section_model)
             if block.caption:
                 preview.append(block.caption)
             for row in block.rows:
                 preview.append("\t".join(cell.value for cell in row))
             paragraph_id += 1
         elif isinstance(block, Note):
-            _write_note(root, block, paragraph_id, note_number, document.metadata, section_start=first_block)
+            _write_note(root, block, paragraph_id, note_number, section_model.metadata or document.metadata, section_start=first_block, section=section_model, registry=registry)
             preview.append(block.text)
             paragraph_id += 1
             note_number += 1
         first_block = False
     if len(root) == 0:
-        _write_paragraph(root, Paragraph(runs=[Run(text="")]), registry, 1, document.metadata, section_start=True)
+        _write_paragraph(root, Paragraph(runs=[Run(text="")]), registry, 1, section_model.metadata or document.metadata, section_start=True, section=section_model)
     return root, "\n".join(preview)
 
 
@@ -396,6 +410,23 @@ def _new_paragraph(parent: ET.Element, paragraph_id: int, style_id: int = 0) -> 
     )
 
 
+def _write_page_break(
+    parent: ET.Element,
+    paragraph_id: int,
+    metadata: dict[str, object],
+    *,
+    section_start: bool = False,
+    section: Section | None = None,
+    registry: IdRegistry | None = None,
+) -> None:
+    p = _new_paragraph(parent, paragraph_id, _style_id("body"))
+    p.set("pageBreak", "1")
+    if section_start:
+        _write_section_properties(p, metadata, section=section, registry=registry)
+    run = ET.SubElement(p, q(HP, "run"), {"charPrIDRef": str(_style_id("body"))})
+    ET.SubElement(run, q(HP, "t"))
+
+
 def _write_paragraph(
     parent: ET.Element,
     paragraph: Paragraph,
@@ -405,12 +436,13 @@ def _write_paragraph(
     *,
     section_start: bool = False,
     para_pr_id: int | None = None,
+    section: Section | None = None,
 ) -> None:
     style_id = _style_id(paragraph.style)
     p = _new_paragraph(parent, paragraph_id, style_id)
     p.set("paraPrIDRef", str(para_pr_id if para_pr_id is not None else style_id))
     if section_start:
-        _write_section_properties(p, metadata)
+        _write_section_properties(p, metadata, section=section, registry=registry)
     if paragraph.bookmark:
         run = ET.SubElement(p, q(HP, "run"), {"charPrIDRef": str(style_id)})
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
@@ -477,10 +509,11 @@ def _write_table(
     image_ids: dict[int, str],
     *,
     section_start: bool = False,
+    section: Section | None = None,
 ) -> None:
     p = _new_paragraph(parent, paragraph_id)
     if section_start:
-        _write_section_properties(p, metadata)
+        _write_section_properties(p, metadata, section=section, registry=registry)
     run = ET.SubElement(p, q(HP, "run"), {"charPrIDRef": "0"})
     if table.bookmark:
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
@@ -634,11 +667,13 @@ def _write_note(
     metadata: dict[str, object],
     *,
     section_start: bool = False,
+    section: Section | None = None,
+    registry: IdRegistry | None = None,
 ) -> None:
     note_style_id = _style_id("source-note")
     p = _new_paragraph(parent, paragraph_id, note_style_id)
     if section_start:
-        _write_section_properties(p, metadata)
+        _write_section_properties(p, metadata, section=section, registry=registry)
     run = ET.SubElement(p, q(HP, "run"), {"charPrIDRef": str(note_style_id)})
     ctrl = ET.SubElement(run, q(HP, "ctrl"))
     element_name = "footNote" if note.kind == "footnote" else "endNote"
@@ -650,7 +685,7 @@ def _write_note(
     ET.SubElement(run, q(HP, "t"))
 
 
-def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]) -> None:
+def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object], *, section: Section | None = None, registry: IdRegistry | None = None) -> None:
     layout = resolve_layout(metadata)
     column_count = _column_count(metadata)
     column_gap = _column_gap(metadata)
@@ -672,11 +707,10 @@ def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]
         },
     )
     ET.SubElement(sec_pr, q(HP, "grid"), {"lineGrid": "0", "charGrid": "0", "wonggojiFormat": "0"})
-    ET.SubElement(
-        sec_pr,
-        q(HP, "startNum"),
-        {"pageStartsOn": "BOTH", "page": "0", "pic": "0", "tbl": "0", "equation": "0"},
-    )
+    page_start = 0
+    if section and section.page_number and section.page_number.get("start"):
+        page_start = max(0, int(section.page_number["start"]) - 1)
+    ET.SubElement(sec_pr, q(HP, "startNum"), {"pageStartsOn": "BOTH", "page": str(page_start), "pic": "0", "tbl": "0", "equation": "0"})
     ET.SubElement(
         sec_pr,
         q(HP, "visibility"),
@@ -728,6 +762,30 @@ def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]
         q(HP, "colPr"),
         {"id": "", "type": "NEWSPAPER", "layout": "LEFT", "colCount": str(column_count), "sameSz": "1", "sameGap": str(column_gap if column_count > 1 else 0)},
     )
+    if section is None:
+        return
+    if section.page_number:
+        page_run = ET.SubElement(paragraph, q(HP, "run"), {"charPrIDRef": str(_style_id("body"))})
+        page_ctrl = ET.SubElement(page_run, q(HP, "ctrl"))
+        ET.SubElement(page_ctrl, q(HP, "pageNum"), {
+            "pos": section.page_number["position"],
+            "formatType": section.page_number["format"],
+            "sideChar": section.page_number.get("side_char", ""),
+        })
+    for kind, paragraphs, control_id in (("header", section.header, 1), ("footer", section.footer, 2)):
+        if not paragraphs:
+            continue
+        field_run = ET.SubElement(paragraph, q(HP, "run"), {"charPrIDRef": str(_style_id("body"))})
+        field_ctrl = ET.SubElement(field_run, q(HP, "ctrl"))
+        container = ET.SubElement(field_ctrl, q(HP, kind), {"id": str(control_id), "applyPageType": "BOTH"})
+        sublist = ET.SubElement(container, q(HP, "subList"), {
+            "id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK", "vertAlign": "TOP",
+            "linkListIDRef": "0", "linkListNextIDRef": "0", "textWidth": str(_content_width(metadata)),
+            "textHeight": str(_mm(float(resolve_layout(metadata)["header_mm" if kind == "header" else "footer_mm"]))),
+            "hasTextRef": "0", "hasNumRef": "0",
+        })
+        for header_paragraph in paragraphs:
+            _write_paragraph(sublist, header_paragraph, registry or IdRegistry(), 0, metadata)
 
 
 def _write_note_properties(
@@ -790,13 +848,15 @@ def _validate_style_specs() -> None:
 
 def _collect_images(document: Document) -> list[ImageAsset]:
     images: list[ImageAsset] = []
-    for block in document.blocks:
-        if not isinstance(block, Table):
-            continue
-        for row in block.rows:
-            for cell in row:
-                if cell.image is not None:
-                    images.append(cell.image)
+    source_sections = document.sections or [Section(blocks=document.blocks, metadata=document.metadata)]
+    for source_section in source_sections:
+        for block in source_section.blocks:
+            if not isinstance(block, Table):
+                continue
+            for row in block.rows:
+                for cell in row:
+                    if cell.image is not None:
+                        images.append(cell.image)
     return images
 
 

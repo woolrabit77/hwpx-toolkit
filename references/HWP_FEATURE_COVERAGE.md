@@ -16,8 +16,8 @@ This is a practical priority list, not measured usage telemetry. Hancom does not
 | 10 | Tabs and indents | Supported through semantic `tabs` and `indent` paragraph properties |
 | 11 | Bullets and numbering | Supported through editable HWPML numbering and bullet definitions |
 | 12 | Page setup and margins | Supported per template profile |
-| 13 | Headers, footers, page numbers | Partial; static footer text only in the standalone core |
-| 14 | Page, column, section breaks | Column profile supported; advanced multi-section work is limited |
+| 13 | Headers, footers, page numbers | Supported for semantic text controls and editable `hp:pageNum` fields in each section |
+| 14 | Page, column, section breaks | Supported for explicit page-break paragraphs and independently packaged multi-section documents |
 | 15 | Tables | Supported for rectangular tables |
 | 16 | Merge and split cells | Not yet supported by the public spec |
 | 17 | Table borders and shading | Borders supported; shading limited |

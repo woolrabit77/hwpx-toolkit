@@ -317,6 +317,14 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
                 field_ends[(element.get("beginIDRef", ""), element.get("fieldid", ""))] += 1
             if local == "run":
                 _require_declared(name, "charPrIDRef", element, declared["charPr"], errors)
+            elif local == "pageNum":
+                if element.get("pos") not in {"TOP_LEFT", "TOP_CENTER", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_CENTER", "BOTTOM_RIGHT"}:
+                    errors.append(f"{name}: pageNum has an unsupported position.")
+                if element.get("formatType") not in {"DIGIT", "ROMAN_SMALL", "ROMAN_CAPITAL", "LATIN_SMALL", "LATIN_CAPITAL"}:
+                    errors.append(f"{name}: pageNum has an unsupported formatType.")
+            elif local in {"header", "footer"}:
+                if not any(_local(child.tag) == "subList" for child in element):
+                    errors.append(f"{name}: {local} is missing its subList content.")
             elif local == "p":
                 _require_declared(name, "paraPrIDRef", element, declared["paraPr"], errors)
                 _require_declared(name, "styleIDRef", element, declared["style"], errors)
@@ -357,6 +365,8 @@ def inspect_hwpx(path: Path) -> dict[str, object]:
             root = ET.fromstring(archive.read(name))
             for element in root.iter():
                 counts[_local(element.tag)] += 1
+                if _local(element.tag) == "p" and element.get("pageBreak") == "1":
+                    counts["pageBreak"] += 1
                 if _local(element.tag) == "bookmark" and element.get("name"):
                     bookmarks.append(element.get("name", ""))
         return {
@@ -370,6 +380,10 @@ def inspect_hwpx(path: Path) -> dict[str, object]:
             "endnotes": counts["endNote"],
             "bookmarks": bookmarks,
             "fields": counts["fieldBegin"],
+            "page_numbers": counts["pageNum"],
+            "headers": counts["header"],
+            "footers": counts["footer"],
+            "page_breaks": counts["pageBreak"],
             "numberings": header_counts["numbering"],
             "bullets": header_counts["bullet"],
             "tab_stops": header_counts["tabItem"],

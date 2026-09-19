@@ -25,6 +25,31 @@ python scripts/hwpx_tool.py template official-letter -o request.json
 
 Additional `blocks` are appended after the template. Set `replace_template_blocks` to `true` only when the request intentionally replaces the preset structure.
 
+## Sections, headers, footers, and breaks
+
+Use `sections` when a document needs independent page layout or semantic running content. Each section owns its blocks and may define a text-only `header`, text-only `footer`, and an editable `page_number` control. Page numbers are emitted as HWPML `hp:pageNum` controls; they are never rendered as literal digits.
+
+```json
+{
+  "metadata": {"title": "Two sections", "author": "Author"},
+  "sections": [
+    {
+      "header": "First section",
+      "footer": {"text": "Confidential"},
+      "page_number": {"position": "BOTTOM_CENTER", "format": "DIGIT", "side_char": "-"},
+      "blocks": [{"type": "paragraph", "text": "First page"}, {"type": "page_break"}]
+    },
+    {
+      "header": "Second section",
+      "page_number": {"position": "TOP_RIGHT", "start": 3},
+      "blocks": [{"type": "paragraph", "text": "Second section starts here"}]
+    }
+  ]
+}
+```
+
+`page_break` is a genuine paragraph page break. Multiple `sections` produce `Contents/section0.xml`, `Contents/section1.xml`, and corresponding manifest/spine/RDF entries. For a single block stream, a `section_break` block begins the next section and may carry that section's `header`, `footer`, `page_number`, and `metadata`. Header/footer tables, images, manual page-number text, unsupported page-number positions/formats, and other approximations are rejected.
+
 ## Untemplated request
 
 ```json
