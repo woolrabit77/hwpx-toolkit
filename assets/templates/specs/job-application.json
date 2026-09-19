@@ -1,0 +1,40 @@
+{
+  "id": "job-application",
+  "name": "One-page job application",
+  "description": "A compact A4 employment application built from tables with an embedded applicant portrait.",
+  "defaults": {
+    "company": "",
+    "position": "",
+    "name": "",
+    "birth_date": "",
+    "phone": "",
+    "email": "",
+    "address": "",
+    "photo_path": "",
+    "education_1": "",
+    "education_2": "",
+    "experience_1": "",
+    "experience_2": "",
+    "skills": "",
+    "portfolio": "",
+    "statement": "",
+    "date": "",
+    "signature": ""
+  },
+  "spec": {
+    "metadata": {
+      "title": "{{company}} 입사 지원서",
+      "layout": {"left_mm": 12, "right_mm": 12, "top_mm": 10, "bottom_mm": 10, "header_mm": 6, "footer_mm": 6, "columns": 1}
+    },
+    "blocks": [
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1], "row_heights_mm": [12], "rows": [[{"value": "{{company}} 입사 지원서", "style": "document-title"}]]},
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [4, 1], "row_heights_mm": [42], "rows": [[{"value": "지원 직무  {{position}}\n성명  {{name}}\n생년월일  {{birth_date}}\n연락처  {{phone}}\n이메일  {{email}}", "style": "body"}, {"image": {"path": "{{photo_path}}", "width_mm": 30, "height_mm": 40, "alt": "가상 지원자 증명사진"}}]]},
+      {"type": "table", "border_style": "grid", "header_rows": 1, "column_widths": [1, 4], "row_heights_mm": [8, 8, 8], "rows": [["기본 정보", "내용"], [{"value": "주소", "style": "form-label"}, "{{address}}"], [{"value": "포트폴리오", "style": "form-label"}, "{{portfolio}}"]]},
+      {"type": "table", "border_style": "grid", "header_rows": 1, "column_widths": [1, 4], "row_heights_mm": [8, 9, 9], "rows": [["학력", "학교·전공·기간"], ["1", "{{education_1}}"], ["2", "{{education_2}}"]]},
+      {"type": "table", "border_style": "grid", "header_rows": 1, "column_widths": [1, 4], "row_heights_mm": [8, 10, 10], "rows": [["경력", "회사·직무·성과"], ["1", "{{experience_1}}"], ["2", "{{experience_2}}"]]},
+      {"type": "table", "border_style": "grid", "header_rows": 1, "column_widths": [1, 4], "row_heights_mm": [8, 12], "rows": [["역량", "기술 및 자격"], [{"value": "핵심 역량", "style": "form-label"}, "{{skills}}"]]},
+      {"type": "table", "border_style": "grid", "header_rows": 1, "column_widths": [1, 4], "row_heights_mm": [8, 24], "rows": [["지원 동기", "요약"], [{"value": "소개", "style": "form-label"}, "{{statement}}"]]},
+      {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1, 2, 1, 2], "row_heights_mm": [9], "rows": [[{"value": "작성일", "style": "form-label"}, "{{date}}", {"value": "지원자", "style": "form-label"}, "{{signature}} (서명)"]]}
+    ]
+  }
+}

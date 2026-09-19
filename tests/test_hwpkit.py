@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ from scripts.hwpkit.formulas import evaluate_formula
 from scripts.hwpkit.pipeline import build_document, inspect_document, validate_document
 from scripts.hwpkit.spec import parse_document_spec
 from scripts.hwpkit.templates import list_templates, starter_spec
+from scripts.hwpkit.writer import MIN_FONT_SIZE, STYLE_SPECS
 
 
 class EquationTests(unittest.TestCase):
@@ -49,6 +51,40 @@ class SpecTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.TestCase):
+    def test_all_generated_styles_are_at_least_ten_points(self) -> None:
+        self.assertTrue(STYLE_SPECS)
+        self.assertTrue(all(int(style["size"]) >= MIN_FONT_SIZE for style in STYLE_SPECS))
+
+    def test_table_cell_image_is_embedded_and_declared(self) -> None:
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            image_path = root / "portrait.png"
+            image_path.write_bytes(png)
+            spec = {
+                "metadata": {"title": "Image test", "author": "Codex"},
+                "blocks": [{
+                    "type": "table",
+                    "header_rows": 0,
+                    "row_heights_mm": [40],
+                    "rows": [[{"image": {"path": "portrait.png", "width_mm": 30, "alt": "Portrait"}}]],
+                }],
+            }
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            self.assertTrue(validate_document(output)["valid"])
+            self.assertEqual(inspect_document(output)["images"], 1)
+            with ZipFile(output) as archive:
+                self.assertEqual(archive.read("BinData/image1.png"), png)
+                content = archive.read("Contents/content.hpf")
+                section = archive.read("Contents/section0.xml")
+                self.assertIn(b'id="image1"', content)
+                self.assertIn(b'binaryItemIDRef="image1"', section)
+
     def test_build_validate_and_inspect(self) -> None:
         spec = {
             "template": None,
@@ -263,7 +299,7 @@ class TemplateTests(unittest.TestCase):
 
     def test_all_approved_templates_build_and_validate(self) -> None:
         templates = list_templates()
-        self.assertEqual(len(templates), 7)
+        self.assertEqual(len(templates), 8)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             for item in templates:

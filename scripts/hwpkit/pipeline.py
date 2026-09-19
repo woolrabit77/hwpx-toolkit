@@ -12,7 +12,7 @@ from .writer import serialize_document
 
 def build_document(spec_path: Path, output: Path) -> dict[str, object]:
     raw = json.loads(spec_path.read_text(encoding="utf-8-sig"))
-    document, registry = parse_document_spec(raw)
+    document, registry = parse_document_spec(raw, base_dir=spec_path.resolve().parent)
     parts = serialize_document(document, registry)
     write_package(parts, output)
     errors = validate_hwpx(output, full=True)

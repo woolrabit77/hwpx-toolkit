@@ -23,10 +23,24 @@ class Paragraph:
 
 
 @dataclass
+class ImageAsset:
+    source: str
+    data: bytes
+    extension: str
+    media_type: str
+    width_px: int
+    height_px: int
+    width_mm: float | None = None
+    height_mm: float | None = None
+    alt: str = ""
+
+
+@dataclass
 class TableCell:
     value: str = ""
     formula: str | None = None
     style: str = "table-cell"
+    image: ImageAsset | None = None
 
 
 @dataclass
@@ -37,6 +51,7 @@ class Table:
     column_widths: list[int] = field(default_factory=list)
     header_rows: int = 1
     border_style: str = "grid"
+    row_heights_mm: list[float] = field(default_factory=list)
 
 
 @dataclass

@@ -5,7 +5,7 @@
   "properties": {
     "template": {
       "type": ["null", "string"],
-      "enum": [null, "none", "official-letter", "press-release", "statutory-form", "kice-exam", "academic-humanities", "academic-stem", "policy-report"]
+      "enum": [null, "none", "official-letter", "press-release", "statutory-form", "job-application", "kice-exam", "academic-humanities", "academic-stem", "policy-report"]
     },
     "metadata": {"type": "object"},
     "data": {"type": "object"},
@@ -23,6 +23,7 @@
           "text": {"type": "string"},
           "script": {"type": "string"},
           "column_widths": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "row_heights_mm": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}},
           "header_rows": {"type": "integer", "minimum": 0},
           "border_style": {"enum": ["none", "plain", "subtle", "grid", "form"]}
         }

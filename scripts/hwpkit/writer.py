@@ -4,7 +4,7 @@ from xml.etree import ElementTree as ET
 
 from .equations import estimate_equation_box, normalize_equation
 from .ids import IdRegistry
-from .model import Document, Note, Paragraph, Run, Table
+from .model import Document, ImageAsset, Note, Paragraph, Run, Table
 
 
 HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -21,34 +21,35 @@ RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 PKG_META = "http://www.hancom.co.kr/hwpml/2016/meta/pkg#"
 XML = "http://www.w3.org/XML/1998/namespace"
 BLACK = "#000000"
+MIN_FONT_SIZE = 1000
 
 
 STYLE_SPECS: list[dict[str, object]] = [
-    {"name": "body", "size": 1000, "font": 0, "align": "JUSTIFY", "line": 160},
-    {"name": "document-title", "size": 2200, "font": 1, "bold": True, "align": "CENTER", "line": 130, "before": 700, "after": 700, "keep": True},
-    {"name": "subtitle", "size": 1300, "font": 1, "bold": True, "align": "CENTER", "line": 140, "after": 400},
-    {"name": "meta", "size": 850, "font": 1, "align": "RIGHT", "line": 130},
+    {"name": "body", "size": 1100, "font": 0, "align": "JUSTIFY", "line": 160},
+    {"name": "document-title", "size": 2000, "font": 1, "bold": True, "align": "CENTER", "line": 130, "before": 500, "after": 500, "keep": True},
+    {"name": "subtitle", "size": 1400, "font": 1, "bold": True, "align": "CENTER", "line": 140, "after": 300},
+    {"name": "meta", "size": 1000, "font": 1, "align": "RIGHT", "line": 135},
     {"name": "heading-1", "size": 1600, "font": 1, "bold": True, "align": "LEFT", "line": 145, "before": 700, "after": 350, "keep": True},
-    {"name": "heading-2", "size": 1300, "font": 1, "bold": True, "align": "LEFT", "line": 145, "before": 500, "after": 250, "keep": True},
-    {"name": "heading-3", "size": 1100, "font": 1, "bold": True, "align": "LEFT", "line": 150, "before": 350, "after": 180, "keep": True},
-    {"name": "body-small", "size": 850, "font": 0, "align": "JUSTIFY", "line": 145},
-    {"name": "centered", "size": 1000, "font": 0, "align": "CENTER", "line": 150},
-    {"name": "right", "size": 1000, "font": 0, "align": "RIGHT", "line": 150},
-    {"name": "toc-1", "size": 1050, "font": 1, "bold": True, "align": "LEFT", "line": 155, "after": 100},
-    {"name": "toc-2", "size": 950, "font": 0, "align": "LEFT", "line": 150, "left": 1200},
-    {"name": "toc-3", "size": 900, "font": 0, "align": "LEFT", "line": 145, "left": 2400},
-    {"name": "index", "size": 900, "font": 0, "align": "LEFT", "line": 145},
-    {"name": "equation", "size": 1000, "font": 0, "align": "CENTER", "line": 155, "before": 150, "after": 150},
-    {"name": "question", "size": 950, "font": 0, "align": "JUSTIFY", "line": 145, "after": 220, "keep": True},
-    {"name": "instruction", "size": 850, "font": 1, "align": "LEFT", "line": 140, "after": 180},
-    {"name": "form-label", "size": 900, "font": 1, "bold": True, "align": "LEFT", "line": 140},
-    {"name": "table-cell", "size": 850, "font": 0, "align": "LEFT", "line": 135},
-    {"name": "table-header", "size": 850, "font": 1, "bold": True, "align": "CENTER", "line": 135},
-    {"name": "source-note", "size": 750, "font": 0, "align": "LEFT", "line": 130},
-    {"name": "abstract-title", "size": 1050, "font": 1, "bold": True, "align": "CENTER", "line": 140, "before": 250, "after": 180},
-    {"name": "abstract-body", "size": 850, "font": 0, "align": "JUSTIFY", "line": 145, "left": 600, "right": 600},
-    {"name": "references", "size": 850, "font": 0, "align": "LEFT", "line": 140, "left": 700, "intent": -700},
-    {"name": "section-label", "size": 900, "font": 1, "bold": True, "align": "LEFT", "line": 135, "after": 100},
+    {"name": "heading-2", "size": 1400, "font": 1, "bold": True, "align": "LEFT", "line": 145, "before": 500, "after": 250, "keep": True},
+    {"name": "heading-3", "size": 1200, "font": 1, "bold": True, "align": "LEFT", "line": 150, "before": 350, "after": 180, "keep": True},
+    {"name": "body-small", "size": 1000, "font": 0, "align": "JUSTIFY", "line": 145},
+    {"name": "centered", "size": 1100, "font": 0, "align": "CENTER", "line": 150},
+    {"name": "right", "size": 1100, "font": 0, "align": "RIGHT", "line": 150},
+    {"name": "toc-1", "size": 1100, "font": 1, "bold": True, "align": "LEFT", "line": 155, "after": 100},
+    {"name": "toc-2", "size": 1000, "font": 0, "align": "LEFT", "line": 150, "left": 1200},
+    {"name": "toc-3", "size": 1000, "font": 0, "align": "LEFT", "line": 145, "left": 2400},
+    {"name": "index", "size": 1000, "font": 0, "align": "LEFT", "line": 145},
+    {"name": "equation", "size": 1100, "font": 0, "align": "CENTER", "line": 155, "before": 150, "after": 150},
+    {"name": "question", "size": 1100, "font": 0, "align": "JUSTIFY", "line": 145, "after": 220, "keep": True},
+    {"name": "instruction", "size": 1000, "font": 1, "align": "LEFT", "line": 140, "after": 180},
+    {"name": "form-label", "size": 1000, "font": 1, "bold": True, "align": "LEFT", "line": 140},
+    {"name": "table-cell", "size": 1000, "font": 0, "align": "LEFT", "line": 135},
+    {"name": "table-header", "size": 1000, "font": 1, "bold": True, "align": "CENTER", "line": 135},
+    {"name": "source-note", "size": 1000, "font": 0, "align": "LEFT", "line": 130},
+    {"name": "abstract-title", "size": 1100, "font": 1, "bold": True, "align": "CENTER", "line": 140, "before": 250, "after": 180},
+    {"name": "abstract-body", "size": 1000, "font": 0, "align": "JUSTIFY", "line": 145, "left": 600, "right": 600},
+    {"name": "references", "size": 1000, "font": 0, "align": "LEFT", "line": 140, "left": 700, "intent": -700},
+    {"name": "section-label", "size": 1000, "font": 1, "bold": True, "align": "LEFT", "line": 135, "after": 100},
 ]
 STYLE_IDS = {str(spec["name"]): index for index, spec in enumerate(STYLE_SPECS)}
 
@@ -73,22 +74,27 @@ def q(namespace: str, name: str) -> str:
 
 
 def serialize_document(document: Document, registry: IdRegistry) -> dict[str, bytes]:
-    section, preview = _section(document, registry)
+    images = _collect_images(document)
+    image_ids = {id(image): f"image{index}" for index, image in enumerate(images, start=1)}
+    section, preview = _section(document, registry, image_ids)
     parts = {
         "version.xml": _version_xml(),
         "settings.xml": _xml_bytes(_settings()),
         "Contents/header.xml": _xml_bytes(_header()),
         "Contents/section0.xml": _xml_bytes(section),
-        "Contents/content.hpf": _xml_bytes(_content(document)),
+        "Contents/content.hpf": _xml_bytes(_content(document, images)),
         "META-INF/container.xml": _container_xml(),
-        "META-INF/manifest.xml": _xml_bytes(ET.Element(q(ODF_MANIFEST, "manifest"))),
+        "META-INF/manifest.xml": _xml_bytes(_odf_manifest(images)),
         "META-INF/container.rdf": _container_rdf(),
         "Preview/PrvText.txt": preview.encode("utf-8"),
     }
+    for index, image in enumerate(images, start=1):
+        parts[f"BinData/image{index}.{image.extension}"] = image.data
     return parts
 
 
 def _header() -> ET.Element:
+    _validate_style_specs()
     root = ET.Element(q(HH, "head"), {"version": "1.5", "secCnt": "1"})
     ET.SubElement(
         root,
@@ -150,7 +156,7 @@ def _header() -> ET.Element:
     return root
 
 
-def _content(document: Document) -> ET.Element:
+def _content(document: Document, images: list[ImageAsset]) -> ET.Element:
     root = ET.Element(q(OPF, "package"), {"version": "", "unique-identifier": "", "id": ""})
     metadata = ET.SubElement(root, q(OPF, "metadata"))
     ET.SubElement(metadata, q(OPF, "title")).text = document.title
@@ -161,9 +167,18 @@ def _content(document: Document) -> ET.Element:
     ET.SubElement(manifest, q(OPF, "item"), {"id": "header", "href": "Contents/header.xml", "media-type": "application/xml"})
     ET.SubElement(manifest, q(OPF, "item"), {"id": "section0", "href": "Contents/section0.xml", "media-type": "application/xml"})
     ET.SubElement(manifest, q(OPF, "item"), {"id": "settings", "href": "settings.xml", "media-type": "application/xml"})
+    for index, image in enumerate(images, start=1):
+        ET.SubElement(manifest, q(OPF, "item"), {"id": f"image{index}", "href": f"BinData/image{index}.{image.extension}", "media-type": image.media_type})
     spine = ET.SubElement(root, q(OPF, "spine"))
     ET.SubElement(spine, q(OPF, "itemref"), {"idref": "header", "linear": "yes"})
     ET.SubElement(spine, q(OPF, "itemref"), {"idref": "section0", "linear": "yes"})
+    return root
+
+
+def _odf_manifest(images: list[ImageAsset]) -> ET.Element:
+    root = ET.Element(q(ODF_MANIFEST, "manifest"))
+    for index, image in enumerate(images, start=1):
+        ET.SubElement(root, q(ODF_MANIFEST, "file-entry"), {q(ODF_MANIFEST, "full-path"): f"BinData/image{index}.{image.extension}", q(ODF_MANIFEST, "media-type"): image.media_type})
     return root
 
 
@@ -225,7 +240,7 @@ def _container_rdf() -> bytes:
     ).encode("utf-8")
 
 
-def _section(document: Document, registry: IdRegistry) -> tuple[ET.Element, str]:
+def _section(document: Document, registry: IdRegistry, image_ids: dict[int, str]) -> tuple[ET.Element, str]:
     root = ET.Element(q(HS, "sec"))
     preview: list[str] = []
     paragraph_id = 1
@@ -237,7 +252,7 @@ def _section(document: Document, registry: IdRegistry) -> tuple[ET.Element, str]
             preview.extend(run.text for run in block.runs if run.text)
             paragraph_id += 1
         elif isinstance(block, Table):
-            _write_table(root, block, registry, paragraph_id, document.metadata, section_start=first_block)
+            _write_table(root, block, registry, paragraph_id, document.metadata, image_ids, section_start=first_block)
             if block.caption:
                 preview.append(block.caption)
             for row in block.rows:
@@ -334,10 +349,7 @@ def _write_run(parent: ET.Element, model: Run, registry: IdRegistry, style_id: i
         field_id = registry.allocate("field_instance") + 3000
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
         ET.SubElement(ctrl, q(HP, "fieldBegin"), {"id": str(begin_id), "type": "HYPERLINK", "name": link, "editable": "0", "dirty": "0", "zorder": "-1", "fieldid": str(field_id)})
-    text = ET.SubElement(run, q(HP, "t"))
-    text.text = model.text
-    if model.text[:1].isspace() or model.text[-1:].isspace():
-        text.set(q(XML, "space"), "preserve")
+    _write_text(run, model.text)
     if begin_id is not None and field_id is not None:
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
         ET.SubElement(ctrl, q(HP, "fieldEnd"), {"beginIDRef": str(begin_id), "fieldid": str(field_id)})
@@ -349,6 +361,7 @@ def _write_table(
     registry: IdRegistry,
     paragraph_id: int,
     metadata: dict[str, object],
+    image_ids: dict[int, str],
     *,
     section_start: bool = False,
 ) -> None:
@@ -377,7 +390,8 @@ def _write_table(
         q(HP, "tbl"),
         {"id": str(registry.allocate("table") + 3000), "zOrder": "0", "numberingType": "TABLE", "textWrap": "TOP_AND_BOTTOM", "textFlow": "BOTH_SIDES", "lock": "0", "pageBreak": "CELL", "repeatHeader": "1" if table.header_rows else "0", "rowCnt": str(row_count), "colCnt": str(col_count), "cellSpacing": "0", "borderFillIDRef": str(border_fill_id), "noAdjust": "0"},
     )
-    ET.SubElement(tbl, q(HP, "sz"), {"width": str(table_width), "widthRelTo": "ABSOLUTE", "height": str(row_count * 2400), "heightRelTo": "ABSOLUTE", "protect": "0"})
+    row_heights = [_mm(value) for value in table.row_heights_mm] if table.row_heights_mm else [2400] * row_count
+    ET.SubElement(tbl, q(HP, "sz"), {"width": str(table_width), "widthRelTo": "ABSOLUTE", "height": str(sum(row_heights)), "heightRelTo": "ABSOLUTE", "protect": "0"})
     ET.SubElement(tbl, q(HP, "pos"), {"treatAsChar": "1", "affectLSpacing": "0", "flowWithText": "1", "allowOverlap": "0", "holdAnchorAndSO": "0", "vertRelTo": "PARA", "horzRelTo": "PARA", "vertAlign": "TOP", "horzAlign": "LEFT", "vertOffset": "0", "horzOffset": "0"})
     ET.SubElement(tbl, q(HP, "outMargin"), {"left": "0", "right": "0", "top": "0", "bottom": "0"})
     if table.caption:
@@ -390,6 +404,7 @@ def _write_table(
     ET.SubElement(tbl, q(HP, "inMargin"), {"left": "141", "right": "141", "top": "141", "bottom": "141"})
     for row_index, row_model in enumerate(table.rows):
         tr = ET.SubElement(tbl, q(HP, "tr"))
+        row_height = row_heights[row_index]
         for col_index, cell_model in enumerate(row_model):
             tc = ET.SubElement(tr, q(HP, "tc"), {"name": "", "header": "1" if row_index < table.header_rows else "0", "hasMargin": "1", "protect": "0", "editable": "0", "dirty": "0", "borderFillIDRef": str(border_fill_id)})
             ET.SubElement(tc, q(HP, "cellAddr"), {"colAddr": str(col_index), "rowAddr": str(row_index)})
@@ -399,13 +414,19 @@ def _write_table(
             if cell_style == "table-cell" and row_index < table.header_rows:
                 cell_style = "table-header"
             cell_style_id = _style_id(cell_style)
-            ET.SubElement(tc, q(HP, "cellSz"), {"width": str(cell_width), "height": "2400"})
+            ET.SubElement(tc, q(HP, "cellSz"), {"width": str(cell_width), "height": str(row_height)})
             ET.SubElement(tc, q(HP, "cellMargin"), {"left": "141", "right": "141", "top": "141", "bottom": "141"})
-            sub = ET.SubElement(tc, q(HP, "subList"), {"id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK", "vertAlign": "CENTER", "linkListIDRef": "0", "linkListNextIDRef": "0", "textWidth": str(cell_width), "textHeight": "2400", "hasTextRef": "0", "hasNumRef": "0"})
+            sub = ET.SubElement(tc, q(HP, "subList"), {"id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK", "vertAlign": "CENTER", "linkListIDRef": "0", "linkListNextIDRef": "0", "textWidth": str(cell_width), "textHeight": str(row_height), "hasTextRef": "0", "hasNumRef": "0"})
             cp = _new_paragraph(sub, registry.allocate("cell_para") + 6000, cell_style_id)
             cp.set("paraPrIDRef", str(cell_style_id))
             cr = ET.SubElement(cp, q(HP, "run"), {"charPrIDRef": str(cell_style_id)})
-            if cell_model.formula:
+            if cell_model.image:
+                _write_picture(cr, cell_model.image, image_ids[id(cell_model.image)], registry, cell_width, row_height)
+                if cell_model.value:
+                    _write_text(cr, cell_model.value)
+                else:
+                    ET.SubElement(cr, q(HP, "t"))
+            elif cell_model.formula:
                 begin_id = registry.allocate("field_begin") + 2000
                 field_id = registry.allocate("field_instance") + 3000
                 ctrl = ET.SubElement(cr, q(HP, "ctrl"))
@@ -414,8 +435,82 @@ def _write_table(
                 end = ET.SubElement(cr, q(HP, "ctrl"))
                 ET.SubElement(end, q(HP, "fieldEnd"), {"beginIDRef": str(begin_id), "fieldid": str(field_id)})
             else:
-                ET.SubElement(cr, q(HP, "t")).text = cell_model.value
+                _write_text(cr, cell_model.value)
     ET.SubElement(run, q(HP, "t"))
+
+
+def _write_picture(
+    parent: ET.Element,
+    image: ImageAsset,
+    image_id: str,
+    registry: IdRegistry,
+    cell_width: int,
+    row_height: int,
+) -> None:
+    available_width = max(1000, cell_width - 282)
+    available_height = max(1000, row_height - 282)
+    aspect = image.width_px / image.height_px
+    if image.width_mm is not None and image.height_mm is not None:
+        width = _mm(image.width_mm)
+        height = _mm(image.height_mm)
+    elif image.width_mm is not None:
+        width = _mm(image.width_mm)
+        height = max(1, round(width / aspect))
+    elif image.height_mm is not None:
+        height = _mm(image.height_mm)
+        width = max(1, round(height * aspect))
+    else:
+        width = available_width
+        height = max(1, round(width / aspect))
+    scale = min(1.0, available_width / width, available_height / height)
+    width = max(1, round(width * scale))
+    height = max(1, round(height * scale))
+    org_width = image.width_px * 36
+    org_height = image.height_px * 36
+    scale_x = width / org_width
+    scale_y = height / org_height
+    picture_number = registry.allocate("picture") + 4000
+    pic = ET.SubElement(
+        parent,
+        q(HP, "pic"),
+        {
+            "id": str(picture_number),
+            "instid": str(picture_number),
+            "reverse": "0",
+            "numberingType": "PICTURE",
+            "textWrap": "TOP_AND_BOTTOM",
+            "textFlow": "BOTH_SIDES",
+            "lock": "0",
+            "dropcapstyle": "None",
+            "href": "",
+            "groupLevel": "0",
+        },
+    )
+    ET.SubElement(pic, q(HP, "offset"), {"x": "0", "y": "0"})
+    ET.SubElement(pic, q(HP, "orgSz"), {"width": str(org_width), "height": str(org_height)})
+    ET.SubElement(pic, q(HP, "curSz"), {"width": str(width), "height": str(height)})
+    ET.SubElement(pic, q(HP, "flip"), {"horizontal": "0", "vertical": "0"})
+    ET.SubElement(pic, q(HP, "rotationInfo"), {"angle": "0", "centerX": str(width // 2), "centerY": str(height // 2), "rotateimage": "1"})
+    rendering = ET.SubElement(pic, q(HP, "renderingInfo"))
+    ET.SubElement(rendering, q(HC, "transMatrix"), {"e1": "1", "e2": "0", "e3": "0", "e4": "0", "e5": "1", "e6": "0"})
+    ET.SubElement(rendering, q(HC, "scaMatrix"), {"e1": f"{scale_x:.8g}", "e2": "0", "e3": "0", "e4": "0", "e5": f"{scale_y:.8g}", "e6": "0"})
+    ET.SubElement(rendering, q(HC, "rotMatrix"), {"e1": "1", "e2": "0", "e3": "0", "e4": "0", "e5": "1", "e6": "0"})
+    ET.SubElement(pic, q(HC, "img"), {"binaryItemIDRef": image_id, "bright": "0", "contrast": "0", "effect": "REAL_PIC", "alpha": "0"})
+    rect = ET.SubElement(pic, q(HP, "imgRect"))
+    ET.SubElement(rect, q(HC, "pt0"), {"x": "0", "y": "0"})
+    ET.SubElement(rect, q(HC, "pt1"), {"x": str(org_width), "y": "0"})
+    ET.SubElement(rect, q(HC, "pt2"), {"x": str(org_width), "y": str(org_height)})
+    ET.SubElement(rect, q(HC, "pt3"), {"x": "0", "y": str(org_height)})
+    clip_width = image.width_px * 75
+    clip_height = image.height_px * 75
+    ET.SubElement(pic, q(HP, "imgClip"), {"left": "0", "right": str(clip_width), "top": "0", "bottom": str(clip_height)})
+    ET.SubElement(pic, q(HP, "inMargin"), {"left": "0", "right": "0", "top": "0", "bottom": "0"})
+    ET.SubElement(pic, q(HP, "imgDim"), {"dimwidth": str(clip_width), "dimheight": str(clip_height)})
+    ET.SubElement(pic, q(HP, "effects"))
+    ET.SubElement(pic, q(HP, "sz"), {"width": str(width), "widthRelTo": "ABSOLUTE", "height": str(height), "heightRelTo": "ABSOLUTE", "protect": "0"})
+    ET.SubElement(pic, q(HP, "pos"), {"treatAsChar": "1", "affectLSpacing": "0", "flowWithText": "1", "allowOverlap": "0", "holdAnchorAndSO": "0", "vertRelTo": "PARA", "horzRelTo": "COLUMN", "vertAlign": "TOP", "horzAlign": "CENTER", "vertOffset": "0", "horzOffset": "0"})
+    ET.SubElement(pic, q(HP, "outMargin"), {"left": "0", "right": "0", "top": "0", "bottom": "0"})
+    ET.SubElement(pic, q(HP, "shapeComment")).text = image.alt or f"{image_id}.{image.extension} {image.width_px}x{image.height_px}"
 
 
 def _write_note(
@@ -552,6 +647,41 @@ def _write_note_properties(
 
 def _style_id(name: str) -> int:
     return STYLE_IDS.get(name, STYLE_IDS["body"])
+
+
+def _write_text(parent: ET.Element, value: str) -> None:
+    lines = value.split("\n")
+    for index, line in enumerate(lines):
+        text = ET.SubElement(parent, q(HP, "t"))
+        text.text = line
+        if line[:1].isspace() or line[-1:].isspace():
+            text.set(q(XML, "space"), "preserve")
+        if index < len(lines) - 1:
+            ET.SubElement(parent, q(HP, "lineBreak"))
+
+
+def _validate_style_specs() -> None:
+    names: set[str] = set()
+    for spec in STYLE_SPECS:
+        name = str(spec["name"])
+        if name in names:
+            raise ValueError(f"Duplicate style name: {name}")
+        names.add(name)
+        size = int(spec.get("size", MIN_FONT_SIZE))
+        if size < MIN_FONT_SIZE:
+            raise ValueError(f"Generated style '{name}' is below the 10 pt minimum: {size / 100:g} pt")
+
+
+def _collect_images(document: Document) -> list[ImageAsset]:
+    images: list[ImageAsset] = []
+    for block in document.blocks:
+        if not isinstance(block, Table):
+            continue
+        for row in block.rows:
+            for cell in row:
+                if cell.image is not None:
+                    images.append(cell.image)
+    return images
 
 
 def _mm(value: float) -> int:

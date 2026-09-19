@@ -38,6 +38,7 @@ Read [references/document-spec.md](references/document-spec.md) for JSON syntax.
 - `official-letter`: Korean public-sector outgoing letter
 - `press-release`: government press release
 - `statutory-form`: table-driven statutory or civil application form
+- `job-application`: one-page, table-driven employment application with an embedded applicant image
 - `kice-exam`: two-column KICE-style examination paper
 - `academic-humanities`: single-column humanities or social-science article
 - `academic-stem`: compact two-column STEM article
@@ -54,6 +55,8 @@ The source definitions are in `assets/templates/specs/`. Blank validated HWPX fi
 - Emit a complete first-section definition. `secPr` must include grid, start numbering, visibility, line-number shape, page properties, footnote properties, endnote properties, and page-border settings before the column definition.
 - Write to an atomic temporary ZIP, verify entry order, `mimetype`, CRC, XML namespaces, required parts, container/RDF targets, manifest paths and media types, spine, IDs, bookmarks, fields, and references, then replace the output.
 - All generated character styles and editable equations use `#000000` as the default text color. Do not introduce colored hyperlink character styles unless the user explicitly requests colored text.
+- All generated character styles are at least 10 pt. Use 11 pt for ordinary body text and 10 pt only for compact metadata, tables, notes, captions, references, and similar secondary text. Never shrink text to force pagination; adjust spacing, row height, margins, or content density instead.
+- Embed PNG or JPEG images through the Document Spec table-cell image object. Register every image in `BinData/` and `Contents/content.hpf`, preserve its aspect ratio, and scale it down to the available cell box.
 - Do not silently approximate an unsupported feature with lookalike text or images.
 - A feature locked by the Conformance Gate must fail explicitly.
 - Do not overwrite an input document. Use a new output path.

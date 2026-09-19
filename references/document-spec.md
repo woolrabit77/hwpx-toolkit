@@ -58,7 +58,7 @@ Additional `blocks` are appended after the template. Set `replace_template_block
 - `paragraph`: `text` or `runs`; optional `style`, `bookmark`, and `index_terms`
 - `heading`: `level` from 1 to 9, text, and optional bookmark
 - `equation`: editable HWP equation `script`; box size is automatic
-- `table`: rectangular rows, optional caption, bookmark, column widths, header-row count, formulas, and border style
+- `table`: rectangular rows, optional caption, bookmark, column widths, row heights in millimetres, header-row count, formulas, images, and border style
 - `footnote`, `endnote`: non-empty note text
 - `toc`: linked entries for selected heading levels; static page numbers are not generated
 - `index`: sorted unique terms
@@ -66,6 +66,27 @@ Additional `blocks` are appended after the template. Set `replace_template_block
 ## Paragraph styles
 
 The stable preset style names include `document-title`, `subtitle`, `meta`, `heading-1`, `heading-2`, `heading-3`, `body`, `body-small`, `centered`, `right`, `question`, `instruction`, `form-label`, `table-cell`, `table-header`, `abstract-title`, `abstract-body`, `references`, and `source-note`.
+
+Generated styles never fall below 10 pt. The default body is 11 pt; compact table, note, reference, and metadata styles use 10 pt.
+
+## Images in table cells
+
+Images are embedded through a table cell object. Paths are resolved relative to the request JSON file. PNG and JPEG are supported.
+
+```json
+{
+  "type": "table",
+  "header_rows": 0,
+  "column_widths": [4, 1],
+  "row_heights_mm": [42],
+  "rows": [[
+    "Applicant profile",
+    {"image": {"path": "portrait.png", "width_mm": 30, "height_mm": 40, "alt": "Applicant portrait"}}
+  ]]
+}
+```
+
+The writer preserves aspect ratio and scales the image down to fit the cell. It registers the binary in both `BinData/` and `Contents/content.hpf`.
 
 ## Links and targets
 

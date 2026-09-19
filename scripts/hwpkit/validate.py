@@ -253,6 +253,12 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
             if local in declared and element.get("id") is not None:
                 declared[local].add(element.get("id", ""))
     bookmarks: set[str] = set()
+    content = roots.get("Contents/content.hpf")
+    image_ids = {
+        _attr(element, "id")
+        for element in content.iter()
+        if _local(element.tag) == "item" and (_attr(element, "media-type") or "").startswith("image/")
+    } if content is not None else set()
     field_begins: Counter[tuple[str, str]] = Counter()
     field_ends: Counter[tuple[str, str]] = Counter()
     ids: Counter[tuple[str, str]] = Counter()
@@ -292,6 +298,12 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
             # files, so only globally addressed drawing/object IDs are checked.
             if value and local in {"equation", "tbl"}:
                 ids[(local, value)] += 1
+            if local == "pic" and value:
+                ids[(local, value)] += 1
+            if local == "img":
+                image_ref = element.get("binaryItemIDRef")
+                if not image_ref or image_ref not in image_ids:
+                    errors.append(f"{name}: picture points to an undeclared image: {image_ref or '(missing)'}")
             if local == "bookmark":
                 bookmark = element.get("name", "")
                 if not bookmark:
@@ -348,6 +360,7 @@ def inspect_hwpx(path: Path) -> dict[str, object]:
             "paragraphs": counts["p"],
             "tables": counts["tbl"],
             "equations": counts["equation"],
+            "images": counts["pic"],
             "footnotes": counts["footNote"],
             "endnotes": counts["endNote"],
             "bookmarks": bookmarks,

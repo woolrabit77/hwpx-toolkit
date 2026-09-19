@@ -1,0 +1,22 @@
+{
+  "template": "job-application",
+  "data": {
+    "company": "",
+    "position": "",
+    "name": "",
+    "birth_date": "",
+    "phone": "",
+    "email": "",
+    "address": "",
+    "photo_path": "",
+    "education_1": "",
+    "education_2": "",
+    "experience_1": "",
+    "experience_2": "",
+    "skills": "",
+    "portfolio": "",
+    "statement": "",
+    "date": "",
+    "signature": ""
+  }
+}
