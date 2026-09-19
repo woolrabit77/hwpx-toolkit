@@ -88,6 +88,7 @@ Use `sections` when a document needs independent page layout or semantic running
 ### Table semantics
 
 Cell spans are real HWPML `hp:cellSpan` values. A cell consumes the next available grid slot in its row; a row-spanning cell occupies the same columns in following rows. The canonical form is `{"span": {"rows": 2, "cols": 2}}` (the equivalent `row_span`/`col_span` fields are accepted). Covered cells are omitted from the row rather than faked with text. Overlaps, spans outside the table, and ambiguous span declarations fail with `SpecError`.
+Every physical row must still cover the complete inferred logical grid; use an empty cell for an intentionally blank unspanned slot.
 
 ```json
 {
@@ -98,7 +99,7 @@ Cell spans are real HWPML `hp:cellSpan` values. A cell consumes the next availab
   "rows": [
     [{"value": "Merged heading", "span": {"cols": 2}}, "Amount"],
     [{"value": "A", "shading": "#FFF2CC"}, 10, 20],
-    ["Total", {"formula": "SUM(B2:C2)"}]
+    ["Total", {"formula": "SUM(B2:C2)"}, ""]
   ]
 }
 ```

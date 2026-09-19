@@ -481,6 +481,12 @@ def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Tabl
                 result = evaluate_formula(cell.formula, formula_rows)
                 cell.value = str(int(result)) if result.is_integer() else f"{result:.10g}"
                 formula_rows[cell.row_index][cell.col_index] = cell.value
+    for row_index in range(len(rows)):
+        missing = [col_index for col_index in range(max_col) if (row_index, col_index) not in occupancy]
+        if missing:
+            raise SpecError(
+                f"table row {row_index + 1} does not cover the logical grid; add cells or an explicit span."
+            )
     column_widths = block.get("column_widths") or []
     if column_widths:
         if not isinstance(column_widths, list) or len(column_widths) != max_col:

@@ -16,7 +16,7 @@
         ],
         ["Detail"],
         ["A", 10, 20],
-        ["Total", {"formula": "SUM(B3:C3)+5"}]
+        ["Total", {"formula": "SUM(B3:C3)+5"}, ""]
       ]
     }
   ]

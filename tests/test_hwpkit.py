@@ -385,7 +385,7 @@ class PipelineTests(unittest.TestCase):
                     [{"value": "Merged", "span": {"rows": 2, "cols": 2}}, {"value": "Value", "shading": "#FFF2CC"}],
                     ["Detail"],
                     ["A", 10, 20],
-                    ["Total", {"formula": "SUM(B3:C3)+5"}],
+                    ["Total", {"formula": "SUM(B3:C3)+5"}, ""],
                 ],
             }],
         }
