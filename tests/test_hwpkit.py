@@ -112,6 +112,40 @@ class PipelineTests(unittest.TestCase):
                 ]
                 self.assertEqual(spine, ["header", "section0"])
 
+    def test_build_emits_hancom_compatible_rdf_and_complete_section_properties(self) -> None:
+        spec = {"metadata": {"title": "Compatibility", "author": "Codex"}, "blocks": []}
+        required_secpr_children = {
+            "grid",
+            "startNum",
+            "visibility",
+            "lineNumberShape",
+            "pagePr",
+            "footNotePr",
+            "endNotePr",
+            "pageBorderFill",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as archive:
+                rdf = archive.read("META-INF/container.rdf")
+                self.assertTrue(
+                    rdf.startswith(b'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>')
+                )
+                rdf_root = rdf.split(b">", 2)[1]
+                self.assertNotIn(b"xmlns:pkg=", rdf_root)
+                self.assertNotIn(b"xmlns:ns0=", rdf_root)
+                self.assertEqual(rdf.count(b"<ns0:hasPart xmlns:ns0="), 2)
+                section = ET.fromstring(archive.read("Contents/section0.xml"))
+                sec_pr = next(
+                    element for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "secPr"
+                )
+                children = {child.tag.rsplit("}", 1)[-1] for child in sec_pr}
+                self.assertTrue(required_secpr_children.issubset(children))
+
     def test_validator_rejects_package_missing_hancom_required_part(self) -> None:
         spec = {"metadata": {"title": "Corruption test", "author": "Codex"}, "blocks": []}
         with tempfile.TemporaryDirectory() as temp:
@@ -150,6 +184,53 @@ class PipelineTests(unittest.TestCase):
             result = validate_document(broken)
             self.assertFalse(result["valid"])
             self.assertTrue(any("header" in error for error in result["errors"]))
+
+    def test_validator_rejects_elementtree_style_rdf_serialization(self) -> None:
+        spec = {"metadata": {"title": "RDF test", "author": "Codex"}, "blocks": []}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            broken = root / "broken.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as source, ZipFile(broken, "w") as target:
+                for info in source.infolist():
+                    payload = source.read(info.filename)
+                    if info.filename == "META-INF/container.rdf":
+                        payload = payload.replace(
+                            b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">',
+                            b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:pkg="http://www.hancom.co.kr/hwpml/2016/meta/pkg#">',
+                        )
+                    compression = ZIP_STORED if info.filename == "mimetype" else ZIP_DEFLATED
+                    target.writestr(info.filename, payload, compress_type=compression)
+            result = validate_document(broken)
+            self.assertFalse(result["valid"])
+            self.assertTrue(any("package namespace" in error for error in result["errors"]))
+
+    def test_validator_rejects_incomplete_section_properties(self) -> None:
+        spec = {"metadata": {"title": "Section test", "author": "Codex"}, "blocks": []}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            broken = root / "broken.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as source, ZipFile(broken, "w") as target:
+                for info in source.infolist():
+                    payload = source.read(info.filename)
+                    if info.filename == "Contents/section0.xml":
+                        payload = payload.replace(
+                            b'<hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0" />',
+                            b"",
+                            1,
+                        )
+                    compression = ZIP_STORED if info.filename == "mimetype" else ZIP_DEFLATED
+                    target.writestr(info.filename, payload, compress_type=compression)
+            result = validate_document(broken)
+            self.assertFalse(result["valid"])
+            self.assertTrue(any("secPr" in error and "grid" in error for error in result["errors"]))
 
     def test_all_generated_text_colors_are_black(self) -> None:
         spec = {

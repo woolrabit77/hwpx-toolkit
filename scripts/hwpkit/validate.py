@@ -54,6 +54,8 @@ def validate_hwpx(path: Path, *, full: bool = True) -> list[str]:
             _validate_manifest(roots, names, errors)
             _validate_odf_manifest(roots, errors)
             _validate_rdf(roots, errors)
+            if "META-INF/container.rdf" in names:
+                _validate_rdf_serialization(archive.read("META-INF/container.rdf"), errors)
             if full:
                 _validate_references(roots, errors)
     except (OSError, BadZipFile, RuntimeError) as exc:
@@ -218,6 +220,24 @@ def _validate_rdf(roots: dict[str, ET.Element], errors: list[str]) -> None:
             errors.append(f"container.rdf does not link required document part: {required}")
 
 
+def _validate_rdf_serialization(payload: bytes, errors: list[str]) -> None:
+    if not payload.startswith(b'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'):
+        errors.append("container.rdf does not use the Hancom-compatible XML declaration.")
+    declaration_end = payload.find(b">")
+    if declaration_end < 0:
+        return
+    rdf_open_end = payload.find(b">", declaration_end + 1)
+    if rdf_open_end < 0:
+        return
+    rdf_open = payload[declaration_end + 1 : rdf_open_end + 1]
+    if b"<rdf:RDF" not in rdf_open or b"xmlns:rdf=" not in rdf_open:
+        errors.append("container.rdf does not use the Hancom-compatible rdf:RDF root serialization.")
+    if b"xmlns:pkg=" in rdf_open or b"xmlns:ns0=" in rdf_open:
+        errors.append("container.rdf declares the package namespace on rdf:RDF; Hangul requires local hasPart declarations.")
+    if payload.count(b"<ns0:hasPart xmlns:ns0=") < 2:
+        errors.append("container.rdf does not use local package namespace declarations for hasPart.")
+
+
 def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> None:
     header = roots.get("Contents/header.xml")
     declared: dict[str, set[str]] = {
@@ -243,6 +263,20 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
         for required in ("secPr", "pagePr", "margin", "colPr"):
             if local_counts[required] == 0:
                 errors.append(f"{name}: missing page-layout element: {required}")
+        for sec_pr in (element for element in root.iter() if _local(element.tag) == "secPr"):
+            direct_children = {_local(child.tag) for child in sec_pr}
+            required_children = {
+                "grid",
+                "startNum",
+                "visibility",
+                "lineNumberShape",
+                "pagePr",
+                "footNotePr",
+                "endNotePr",
+                "pageBorderFill",
+            }
+            for missing in sorted(required_children - direct_children):
+                errors.append(f"{name}: secPr is missing Hancom-required child: {missing}")
         for page_pr in (element for element in root.iter() if _local(element.tag) == "pagePr"):
             try:
                 width = int(page_pr.get("width", "0"))

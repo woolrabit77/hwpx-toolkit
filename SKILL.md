@@ -50,6 +50,8 @@ The source definitions are in `assets/templates/specs/`. Blank validated HWPX fi
 - The same input must produce the same semantic structure.
 - Generate the complete Hancom package core: `version.xml`, `settings.xml`, `Contents/content.hpf`, `META-INF/container.xml`, `META-INF/manifest.xml`, and `META-INF/container.rdf` in addition to the header, sections, preview, and `mimetype`.
 - In `Contents/content.hpf`, use package-root paths such as `Contents/header.xml`, `Contents/section0.xml`, and `settings.xml`; never use legacy `header.xml` or `section0.xml` relative paths.
+- Serialize `META-INF/container.rdf` in the native Hancom-compatible byte form: keep only the RDF namespace on `rdf:RDF`, declare the package namespace locally on each `hasPart`, and retain the UTF-8 standalone declaration. Semantically equivalent pretty-printed RDF is not sufficient.
+- Emit a complete first-section definition. `secPr` must include grid, start numbering, visibility, line-number shape, page properties, footnote properties, endnote properties, and page-border settings before the column definition.
 - Write to an atomic temporary ZIP, verify entry order, `mimetype`, CRC, XML namespaces, required parts, container/RDF targets, manifest paths and media types, spine, IDs, bookmarks, fields, and references, then replace the output.
 - All generated character styles and editable equations use `#000000` as the default text color. Do not introduce colored hyperlink character styles unless the user explicitly requests colored text.
 - Do not silently approximate an unsupported feature with lookalike text or images.

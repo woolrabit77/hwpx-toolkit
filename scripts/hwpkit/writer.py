@@ -82,7 +82,7 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
         "Contents/content.hpf": _xml_bytes(_content(document)),
         "META-INF/container.xml": _container_xml(),
         "META-INF/manifest.xml": _xml_bytes(ET.Element(q(ODF_MANIFEST, "manifest"))),
-        "META-INF/container.rdf": _xml_bytes(_container_rdf()),
+        "META-INF/container.rdf": _container_rdf(),
         "Preview/PrvText.txt": preview.encode("utf-8"),
     }
     return parts
@@ -194,19 +194,35 @@ def _settings() -> ET.Element:
     return root
 
 
-def _container_rdf() -> ET.Element:
-    root = ET.Element(q(RDF, "RDF"))
-    for path, kind in (
-        ("Contents/header.xml", "HeaderFile"),
-        ("Contents/section0.xml", "SectionFile"),
-    ):
-        document = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): ""})
-        ET.SubElement(document, q(PKG_META, "hasPart"), {q(RDF, "resource"): path})
-        part = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): path})
-        ET.SubElement(part, q(RDF, "type"), {q(RDF, "resource"): f"{PKG_META}{kind}"})
-    document_type = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): ""})
-    ET.SubElement(document_type, q(RDF, "type"), {q(RDF, "resource"): f"{PKG_META}Document"})
-    return root
+def _container_rdf() -> bytes:
+    """Emit the byte-stable RDF form accepted by Hancom Hangul.
+
+    Hangul's package reader is stricter than a general RDF/XML parser. In
+    particular, declaring the package namespace on ``rdf:RDF`` and pretty
+    printing the document can make otherwise equivalent RDF fail to open.
+    Keep the package namespace local to each ``hasPart`` element, matching
+    native HWPX output.
+    """
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
+        f'<rdf:RDF xmlns:rdf="{RDF}">'
+        '<rdf:Description rdf:about="">'
+        f'<ns0:hasPart xmlns:ns0="{PKG_META}" rdf:resource="Contents/header.xml"/>'
+        '</rdf:Description>'
+        '<rdf:Description rdf:about="Contents/header.xml">'
+        f'<rdf:type rdf:resource="{PKG_META}HeaderFile"/>'
+        '</rdf:Description>'
+        '<rdf:Description rdf:about="">'
+        f'<ns0:hasPart xmlns:ns0="{PKG_META}" rdf:resource="Contents/section0.xml"/>'
+        '</rdf:Description>'
+        '<rdf:Description rdf:about="Contents/section0.xml">'
+        f'<rdf:type rdf:resource="{PKG_META}SectionFile"/>'
+        '</rdf:Description>'
+        '<rdf:Description rdf:about="">'
+        f'<rdf:type rdf:resource="{PKG_META}Document"/>'
+        '</rdf:Description>'
+        '</rdf:RDF>'
+    ).encode("utf-8")
 
 
 def _section(document: Document, registry: IdRegistry) -> tuple[ET.Element, str]:
@@ -436,11 +452,11 @@ def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]
         run,
         q(HP, "secPr"),
         {
-            "id": "0",
+            "id": "",
             "textDirection": "HORIZONTAL",
-            "spaceColumns": str(column_gap),
+            "spaceColumns": str(column_gap if column_count > 1 else _mm(4)),
             "tabStop": "8000",
-            "tabStopVal": "8000",
+            "tabStopVal": "4000",
             "tabStopUnit": "HWPUNIT",
             "outlineShapeIDRef": "0",
             "memoShapeIDRef": "0",
@@ -448,22 +464,90 @@ def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]
             "masterPageCnt": "0",
         },
     )
+    ET.SubElement(sec_pr, q(HP, "grid"), {"lineGrid": "0", "charGrid": "0", "wonggojiFormat": "0"})
+    ET.SubElement(
+        sec_pr,
+        q(HP, "startNum"),
+        {"pageStartsOn": "BOTH", "page": "0", "pic": "0", "tbl": "0", "equation": "0"},
+    )
+    ET.SubElement(
+        sec_pr,
+        q(HP, "visibility"),
+        {
+            "hideFirstHeader": "0",
+            "hideFirstFooter": "0",
+            "hideFirstMasterPage": "0",
+            "border": "SHOW_ALL",
+            "fill": "SHOW_ALL",
+            "hideFirstPageNum": "0",
+            "hideFirstEmptyLine": "0",
+            "showLineNumber": "0",
+        },
+    )
+    ET.SubElement(
+        sec_pr,
+        q(HP, "lineNumberShape"),
+        {"restartType": "0", "countBy": "0", "distance": "0", "startNumber": "0"},
+    )
     page_pr = ET.SubElement(
         sec_pr,
         q(HP, "pagePr"),
-        {"landscape": "NARROWLY", "width": str(_mm(float(layout.get("page_width_mm", 210)))), "height": str(_mm(float(layout.get("page_height_mm", 297)))), "gutterType": "LEFT_ONLY"},
+        {"landscape": "WIDELY", "width": str(_mm(float(layout.get("page_width_mm", 210)))), "height": str(_mm(float(layout.get("page_height_mm", 297)))), "gutterType": "LEFT_ONLY"},
     )
     ET.SubElement(
         page_pr,
         q(HP, "margin"),
         {"left": str(_mm(float(layout.get("left_mm", 25)))), "right": str(_mm(float(layout.get("right_mm", 25)))), "top": str(_mm(float(layout.get("top_mm", 20)))), "bottom": str(_mm(float(layout.get("bottom_mm", 18)))), "header": str(_mm(float(layout.get("header_mm", 12)))), "footer": str(_mm(float(layout.get("footer_mm", 12)))), "gutter": "0"},
     )
+    _write_note_properties(sec_pr, "footNotePr", "-1", "283", "EACH_COLUMN")
+    _write_note_properties(sec_pr, "endNotePr", "14692344", "0", "END_OF_DOCUMENT")
+    for border_type in ("BOTH", "EVEN", "ODD"):
+        border = ET.SubElement(
+            sec_pr,
+            q(HP, "pageBorderFill"),
+            {
+                "type": border_type,
+                "borderFillIDRef": "1",
+                "textBorder": "PAPER",
+                "headerInside": "0",
+                "footerInside": "0",
+                "fillArea": "PAPER",
+            },
+        )
+        ET.SubElement(border, q(HP, "offset"), {"left": "1417", "right": "1417", "top": "1417", "bottom": "1417"})
     ctrl = ET.SubElement(run, q(HP, "ctrl"))
     ET.SubElement(
         ctrl,
         q(HP, "colPr"),
-        {"id": "0", "type": "NEWSPAPER", "layout": "LEFT", "colCount": str(column_count), "sameSz": "1", "sameGap": str(column_gap)},
+        {"id": "", "type": "NEWSPAPER", "layout": "LEFT", "colCount": str(column_count), "sameSz": "1", "sameGap": str(column_gap if column_count > 1 else 0)},
     )
+
+
+def _write_note_properties(
+    sec_pr: ET.Element,
+    element_name: str,
+    line_length: str,
+    between_notes: str,
+    placement: str,
+) -> None:
+    note_pr = ET.SubElement(sec_pr, q(HP, element_name))
+    ET.SubElement(
+        note_pr,
+        q(HP, "autoNumFormat"),
+        {"type": "DIGIT", "userChar": "", "prefixChar": "", "suffixChar": ")", "supscript": "0"},
+    )
+    ET.SubElement(
+        note_pr,
+        q(HP, "noteLine"),
+        {"length": line_length, "type": "SOLID", "width": "0.12 mm", "color": BLACK},
+    )
+    ET.SubElement(
+        note_pr,
+        q(HP, "noteSpacing"),
+        {"betweenNotes": between_notes, "belowLine": "567", "aboveLine": "850"},
+    )
+    ET.SubElement(note_pr, q(HP, "numbering"), {"type": "CONTINUOUS", "newNum": "1"})
+    ET.SubElement(note_pr, q(HP, "placement"), {"place": placement, "beneathText": "0"})
 
 
 def _style_id(name: str) -> int:
