@@ -113,7 +113,7 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
     parts = {
         "version.xml": _version_xml(),
         "settings.xml": _xml_bytes(_settings()),
-        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles, shading_ids)),
+        "Contents/header.xml": _xml_bytes(_header(paragraph_profiles, shading_ids, len(sections))),
         "Contents/content.hpf": _xml_bytes(_content(document, images, len(sections))),
         "META-INF/container.xml": _container_xml(),
         "META-INF/manifest.xml": _xml_bytes(_odf_manifest(images)),
@@ -129,6 +129,7 @@ def serialize_document(document: Document, registry: IdRegistry) -> dict[str, by
 def _header(
     paragraph_profiles: list[dict[str, object]] | None = None,
     shading_ids: dict[tuple[str, str], int] | None = None,
+    section_count: int = 1,
 ) -> ET.Element:
     _validate_style_specs()
     paragraph_profiles = paragraph_profiles or []

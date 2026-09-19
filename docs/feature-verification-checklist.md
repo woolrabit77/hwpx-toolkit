@@ -23,7 +23,7 @@
 |---|---|---|---|---|---|
 | P01 | Tabs, indents, bullets, and numbering | Numbering XML, tab/indent fixture, invalid-level rejection | MERGED | 58c36cb | docs/evidence/verification-P01.md @ 6f66459 |
 | P02 | Headers, footers, page numbers, page/section breaks | Multi-section fixture, page-number field inspection, package validation | MERGED | 96de7e9 | docs/evidence/verification-P02.md @ ea595b2 |
-| P03 | Table merge, split, shading, and extended formulas | Spanned-cell grid fixture, shading fixture, formula success/failure tests | VERIFYING | — | — |
+| P03 | Table merge, split, shading, and extended formulas | Spanned-cell grid fixture, shading fixture, formula success/failure tests | MERGED | 37cd767 | docs/evidence/verification-P03.md @ b0ada74 |
 | P04 | Captions, equation numbering, cross-references, TOC page references | Numbered target fixture, update/rebuild test, broken-target rejection | NOT_STARTED | — | — |
 | P05 | Footnote/endnote continuation and existing-document round trip | Multi-section note fixture, parse/write equality or explicit safe refusal | NOT_STARTED | — | — |
 | P06 | PNG/JPEG image expansion | Floating image, image sizing/cropping fixture, manifest/reference checks | NOT_STARTED | — | — |
