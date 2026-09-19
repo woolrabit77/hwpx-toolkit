@@ -24,7 +24,7 @@
   "spec": {
     "metadata": {
       "title": "{{company}} 입사 지원서",
-      "layout": {"left_mm": 12, "right_mm": 12, "top_mm": 10, "bottom_mm": 10, "header_mm": 6, "footer_mm": 6, "columns": 1}
+      "layout": {"profile": "compact-a4"}
     },
     "blocks": [
       {"type": "table", "border_style": "grid", "header_rows": 0, "column_widths": [1], "row_heights_mm": [12], "rows": [[{"value": "{{company}} 입사 지원서", "style": "document-title"}]]},

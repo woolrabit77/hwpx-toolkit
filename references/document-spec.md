@@ -33,7 +33,7 @@ Additional `blocks` are appended after the template. Set `replace_template_block
   "metadata": {
     "title": "Document title",
     "author": "Author",
-    "layout": {"columns": 1, "left_mm": 25, "right_mm": 25}
+    "layout": {"profile": "standard-a4", "columns": 1}
   },
   "blocks": [
     {"type": "heading", "level": 1, "text": "Overview", "bookmark": "overview"},
@@ -58,7 +58,7 @@ Additional `blocks` are appended after the template. Set `replace_template_block
 - `paragraph`: `text` or `runs`; optional `style`, `bookmark`, and `index_terms`
 - `heading`: `level` from 1 to 9, text, and optional bookmark
 - `equation`: editable HWP equation `script`; box size is automatic
-- `table`: rectangular rows, optional caption, bookmark, column widths, row heights in millimetres, header-row count, formulas, images, and border style
+- `table`: rectangular rows, optional caption, bookmark, column widths, row heights in millimetres, header-row count, formulas, images, and border style. Omit `border_style` to use visible black `grid` borders.
 - `footnote`, `endnote`: non-empty note text
 - `toc`: linked entries for selected heading levels; static page numbers are not generated
 - `index`: sorted unique terms
@@ -68,6 +68,16 @@ Additional `blocks` are appended after the template. Set `replace_template_block
 The stable preset style names include `document-title`, `subtitle`, `meta`, `heading-1`, `heading-2`, `heading-3`, `body`, `body-small`, `centered`, `right`, `question`, `instruction`, `form-label`, `table-cell`, `table-header`, `abstract-title`, `abstract-body`, `references`, and `source-note`.
 
 Generated styles never fall below 10 pt. The default body is 11 pt; compact table, note, reference, and metadata styles use 10 pt.
+
+## Page-layout profiles
+
+When `metadata.layout` is omitted, documents use `standard-a4`: A4 portrait with Hancom's standard initial margins (top 20 mm, bottom 15 mm, left/right 30 mm, header/footer 15 mm). Use `compact-a4` only when a form requires more usable area. A layout can override a profile value deliberately.
+
+```json
+"layout": {"profile": "standard-a4", "left_mm": 25, "right_mm": 25}
+```
+
+Available profiles: `standard-a4`, `compact-a4`.
 
 ## Images in table cells
 

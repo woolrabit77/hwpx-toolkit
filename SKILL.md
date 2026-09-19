@@ -56,6 +56,8 @@ The source definitions are in `assets/templates/specs/`. Blank validated HWPX fi
 - Write to an atomic temporary ZIP, verify entry order, `mimetype`, CRC, XML namespaces, required parts, container/RDF targets, manifest paths and media types, spine, IDs, bookmarks, fields, and references, then replace the output.
 - All generated character styles and editable equations use `#000000` as the default text color. Do not introduce colored hyperlink character styles unless the user explicitly requests colored text.
 - All generated character styles are at least 10 pt. Use 11 pt for ordinary body text and 10 pt only for compact metadata, tables, notes, captions, references, and similar secondary text. Never shrink text to force pagination; adjust spacing, row height, margins, or content density instead.
+- New documents use the `standard-a4` page-layout profile unless a selected template explicitly requires another profile: A4 portrait, top 20 mm, bottom 15 mm, left/right 30 mm, and header/footer 15 mm. Reuse `compact-a4` only for space-constrained forms.
+- Tables default to visible black `grid` borders. A borderless or subtle table requires an explicit `border_style` choice in the Document Spec.
 - Embed PNG or JPEG images through the Document Spec table-cell image object. Register every image in `BinData/` and `Contents/content.hpf`, preserve its aspect ratio, and scale it down to the available cell box.
 - Do not silently approximate an unsupported feature with lookalike text or images.
 - A feature locked by the Conformance Gate must fail explicitly.

@@ -4,6 +4,7 @@ from xml.etree import ElementTree as ET
 
 from .equations import estimate_equation_box, normalize_equation
 from .ids import IdRegistry
+from .layouts import resolve_layout
 from .model import Document, ImageAsset, Note, Paragraph, Run, Table
 
 
@@ -538,8 +539,7 @@ def _write_note(
 
 
 def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]) -> None:
-    layout = metadata.get("layout") if isinstance(metadata.get("layout"), dict) else {}
-    assert isinstance(layout, dict)
+    layout = resolve_layout(metadata)
     column_count = _column_count(metadata)
     column_gap = _column_gap(metadata)
     run = ET.SubElement(paragraph, q(HP, "run"), {"charPrIDRef": "0"})
@@ -587,12 +587,12 @@ def _write_section_properties(paragraph: ET.Element, metadata: dict[str, object]
     page_pr = ET.SubElement(
         sec_pr,
         q(HP, "pagePr"),
-        {"landscape": "WIDELY", "width": str(_mm(float(layout.get("page_width_mm", 210)))), "height": str(_mm(float(layout.get("page_height_mm", 297)))), "gutterType": "LEFT_ONLY"},
+        {"landscape": "WIDELY", "width": str(_mm(float(layout["page_width_mm"]))), "height": str(_mm(float(layout["page_height_mm"]))), "gutterType": "LEFT_ONLY"},
     )
     ET.SubElement(
         page_pr,
         q(HP, "margin"),
-        {"left": str(_mm(float(layout.get("left_mm", 25)))), "right": str(_mm(float(layout.get("right_mm", 25)))), "top": str(_mm(float(layout.get("top_mm", 20)))), "bottom": str(_mm(float(layout.get("bottom_mm", 18)))), "header": str(_mm(float(layout.get("header_mm", 12)))), "footer": str(_mm(float(layout.get("footer_mm", 12)))), "gutter": "0"},
+        {"left": str(_mm(float(layout["left_mm"]))), "right": str(_mm(float(layout["right_mm"]))), "top": str(_mm(float(layout["top_mm"]))), "bottom": str(_mm(float(layout["bottom_mm"]))), "header": str(_mm(float(layout["header_mm"]))), "footer": str(_mm(float(layout["footer_mm"]))), "gutter": "0"},
     )
     _write_note_properties(sec_pr, "footNotePr", "-1", "283", "EACH_COLUMN")
     _write_note_properties(sec_pr, "endNotePr", "14692344", "0", "END_OF_DOCUMENT")
@@ -689,29 +689,26 @@ def _mm(value: float) -> int:
 
 
 def _column_count(metadata: dict[str, object]) -> int:
-    layout = metadata.get("layout") if isinstance(metadata.get("layout"), dict) else {}
-    assert isinstance(layout, dict)
+    layout = resolve_layout(metadata)
     try:
-        return max(1, min(4, int(layout.get("columns", 1))))
+        return max(1, min(4, int(layout["columns"])))
     except (TypeError, ValueError):
         return 1
 
 
 def _column_gap(metadata: dict[str, object]) -> int:
-    layout = metadata.get("layout") if isinstance(metadata.get("layout"), dict) else {}
-    assert isinstance(layout, dict)
+    layout = resolve_layout(metadata)
     try:
-        return _mm(float(layout.get("column_gap_mm", 8)))
+        return _mm(float(layout["column_gap_mm"]))
     except (TypeError, ValueError):
         return _mm(8)
 
 
 def _content_width(metadata: dict[str, object]) -> int:
-    layout = metadata.get("layout") if isinstance(metadata.get("layout"), dict) else {}
-    assert isinstance(layout, dict)
-    page = _mm(float(layout.get("page_width_mm", 210)))
-    left = _mm(float(layout.get("left_mm", 25)))
-    right = _mm(float(layout.get("right_mm", 25)))
+    layout = resolve_layout(metadata)
+    page = _mm(float(layout["page_width_mm"]))
+    left = _mm(float(layout["left_mm"]))
+    right = _mm(float(layout["right_mm"]))
     return max(1000, page - left - right)
 
 

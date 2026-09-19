@@ -22,7 +22,7 @@ This is a practical priority list, not measured usage telemetry. Hancom does not
 | 16 | Merge and split cells | Not yet supported by the public spec |
 | 17 | Table borders and shading | Borders supported; shading limited |
 | 18 | Table formulas | Beta safe subset |
-| 19 | Images | Legacy diagnostic utilities only |
+| 19 | Images | PNG/JPEG images embedded in table cells; floating images and image editing are not supported |
 | 20 | Shapes and text boxes | Not in the standalone writer |
 | 21 | Table calculations | Beta |
 | 22 | Hyperlinks | Supported with scheme and target checks |

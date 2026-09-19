@@ -49,6 +49,10 @@ class SpecTests(unittest.TestCase):
                 {"blocks": [{"type": "paragraph", "runs": [{"text": "x", "hyperlink": "#missing"}]}]}
             )
 
+    def test_unknown_layout_profile_is_rejected(self) -> None:
+        with self.assertRaises(SpecError):
+            parse_document_spec({"metadata": {"layout": {"profile": "unknown"}}, "blocks": []})
+
 
 class PipelineTests(unittest.TestCase):
     def test_all_generated_styles_are_at_least_ten_points(self) -> None:
@@ -84,6 +88,27 @@ class PipelineTests(unittest.TestCase):
                 section = archive.read("Contents/section0.xml")
                 self.assertIn(b'id="image1"', content)
                 self.assertIn(b'binaryItemIDRef="image1"', section)
+
+    def test_untitled_document_uses_standard_a4_margins_and_table_grid_borders(self) -> None:
+        spec = {
+            "metadata": {"title": "Defaults", "author": "Codex"},
+            "blocks": [{"type": "table", "header_rows": 0, "rows": [["A", "B"]]}],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as archive:
+                section = ET.fromstring(archive.read("Contents/section0.xml"))
+                margin = next(element for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "margin")
+                self.assertEqual(margin.get("left"), str(round(30 * 283.466)))
+                self.assertEqual(margin.get("right"), str(round(30 * 283.466)))
+                self.assertEqual(margin.get("top"), str(round(20 * 283.466)))
+                self.assertEqual(margin.get("bottom"), str(round(15 * 283.466)))
+                table = next(element for element in section.iter() if element.tag.rsplit("}", 1)[-1] == "tbl")
+                self.assertEqual(table.get("borderFillIDRef"), "1")
 
     def test_build_validate_and_inspect(self) -> None:
         spec = {

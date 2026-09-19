@@ -9,11 +9,13 @@ from .errors import SpecError
 from .features import enforce_conformance
 from .formulas import evaluate_formula
 from .ids import IdRegistry
+from .layouts import resolve_layout
 from .model import Document, ImageAsset, Note, Paragraph, Run, Table, TableCell
 from .templates import apply_template
 
 
 ALLOWED_SCHEMES = {"http", "https", "mailto"}
+TABLE_BORDER_STYLES = {"none", "plain", "subtle", "grid", "form"}
 
 
 def parse_document_spec(raw: dict[str, Any], *, base_dir: Path | None = None) -> tuple[Document, IdRegistry]:
@@ -23,6 +25,10 @@ def parse_document_spec(raw: dict[str, Any], *, base_dir: Path | None = None) ->
     metadata = raw.get("metadata") or {}
     if not isinstance(metadata, dict):
         raise SpecError("metadata must be an object.")
+    try:
+        resolve_layout(metadata)
+    except ValueError as exc:
+        raise SpecError(str(exc)) from exc
     blocks = raw.get("blocks")
     if blocks is None:
         sections = raw.get("sections") or []
@@ -162,6 +168,10 @@ def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Tabl
     header_rows = int(block.get("header_rows", 1))
     if header_rows < 0 or header_rows > len(rows):
         raise SpecError("table.header_rows is outside the valid row range.")
+    border_style = str(block.get("border_style", "grid"))
+    if border_style not in TABLE_BORDER_STYLES:
+        allowed = ", ".join(sorted(TABLE_BORDER_STYLES))
+        raise SpecError(f"table.border_style must be one of: {allowed}")
     row_heights_raw = block.get("row_heights_mm") or []
     if row_heights_raw:
         if not isinstance(row_heights_raw, list) or len(row_heights_raw) != len(rows):
@@ -208,7 +218,7 @@ def _parse_table(block: dict[str, Any], *, base_dir: Path | None = None) -> Tabl
         bookmark=str(block.get("bookmark")) if block.get("bookmark") else None,
         column_widths=list(column_widths),
         header_rows=header_rows,
-        border_style=str(block.get("border_style", "grid")),
+        border_style=border_style,
         row_heights_mm=row_heights_mm,
     )
 
