@@ -4,7 +4,7 @@ Status: `CANDIDATE`
 
 Feature commit: `95e8656` (`feat: add semantic tabs indents bullets and numbering`)
 
-This report is committed separately from the feature commit. Evidence report commit: `342998d56a9b379d69bcb0c4fbb499ad652d51ff`.
+This report is committed separately from the feature commit. Evidence report commits: initial `342998d56a9b379d69bcb0c4fbb499ad652d51ff`; final SHA-recording update `2380292764ad9351ed7a56d477ca0fb9a44d3e4c`.
 
 ## Changed files
 
