@@ -1,8 +1,12 @@
 # P01 implementation evidence
 
-Status: `CANDIDATE`
+Status: `CANDIDATE` (rework cycle 1 complete)
 
 Feature commit: `95e8656` (`feat: add semantic tabs indents bullets and numbering`)
+
+Rework commit: `e3ef3101505eca4aadafba41dc2c01ca699e2e23` (`fix: reject coerced P01 integer fields`)
+
+Terra rework report reviewed: `266318e75cf987c177d249d06265b1354feb002a`.
 
 This report is committed separately from the feature commit. Evidence report commits: initial `342998d56a9b379d69bcb0c4fbb499ad652d51ff`; final SHA-recording update `2380292764ad9351ed7a56d477ca0fb9a44d3e4c`.
 
@@ -18,13 +22,15 @@ This report is committed separately from the feature commit. Evidence report com
 - `tests/fixtures/p01-tabs-lists.json`: reproducible fixture input.
 - `tests/fixtures/p01-tabs-lists.hwpx`: validated fixture artifact.
 
+The rework additionally makes P01 integral fields reject booleans, floats, and numeric strings, and adds parser plus CLI tests proving failed builds produce no output.
+
 ## Exact checks and results
 
 All commands were run in the P01 Luna worktree with no network, Hancom Office, COM, LibreOffice, or external renderer.
 
 ```text
 C:\Users\woolr\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest discover -s tests -v
-Ran 25 tests in 0.575s — OK
+Ran 27 tests in 1.035s — OK
 
 C:\Users\woolr\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe scripts/hwpx_tool.py build tests/fixtures/p01-tabs-lists.json -o tests/fixtures/p01-tabs-lists.hwpx
 validation: passed
