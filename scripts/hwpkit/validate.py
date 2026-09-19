@@ -9,6 +9,13 @@ from zipfile import ZIP_STORED, BadZipFile, ZipFile
 from .package import MIMETYPE_NAME, MIMETYPE_VALUE, REQUIRED_ENTRIES, safe_name
 
 
+HWPX_VERSION_NS = "http://www.hancom.co.kr/hwpml/2011/version"
+HWPX_APP_NS = "http://www.hancom.co.kr/hwpml/2011/app"
+HWPX_OPF_NS = "http://www.idpf.org/2007/opf/"
+ODF_MANIFEST_NS = "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"
+RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+
 def validate_hwpx(path: Path, *, full: bool = True) -> list[str]:
     errors: list[str] = []
     try:
@@ -42,8 +49,11 @@ def validate_hwpx(path: Path, *, full: bool = True) -> list[str]:
                         roots[name] = ET.fromstring(archive.read(name))
                     except ET.ParseError as exc:
                         errors.append(f"XML parsing failed: {name}: {exc}")
+            _validate_package_parts(roots, errors)
             _validate_container(roots, names, errors)
             _validate_manifest(roots, names, errors)
+            _validate_odf_manifest(roots, errors)
+            _validate_rdf(roots, errors)
             if full:
                 _validate_references(roots, errors)
     except (OSError, BadZipFile, RuntimeError) as exc:
@@ -62,25 +72,67 @@ def _attr(element: ET.Element, local: str) -> str | None:
     return None
 
 
+def _namespace(tag: str) -> str:
+    if tag.startswith("{") and "}" in tag:
+        return tag[1:].split("}", 1)[0]
+    return ""
+
+
+def _validate_package_parts(roots: dict[str, ET.Element], errors: list[str]) -> None:
+    version = roots.get("version.xml")
+    if version is not None:
+        if _local(version.tag) != "HCFVersion" or _namespace(version.tag) != HWPX_VERSION_NS:
+            errors.append("version.xml does not use the Hancom HCFVersion namespace.")
+        if version.get("tagetApplication") != "WORDPROCESSOR":
+            errors.append("version.xml tagetApplication must be WORDPROCESSOR.")
+        if not version.get("xmlVersion"):
+            errors.append("version.xml has no xmlVersion.")
+    settings = roots.get("settings.xml")
+    if settings is not None:
+        if _local(settings.tag) != "HWPApplicationSetting" or _namespace(settings.tag) != HWPX_APP_NS:
+            errors.append("settings.xml does not use the Hancom application namespace.")
+        if not any(_local(element.tag) == "CaretPosition" for element in settings.iter()):
+            errors.append("settings.xml has no CaretPosition.")
+
+
 def _validate_container(roots: dict[str, ET.Element], names: set[str], errors: list[str]) -> None:
     root = roots.get("META-INF/container.xml")
     if root is None:
         return
-    targets = [_attr(element, "full-path") for element in root.iter() if _local(element.tag) == "rootfile"]
+    rootfiles = [element for element in root.iter() if _local(element.tag) == "rootfile"]
+    targets = [_attr(element, "full-path") for element in rootfiles]
     targets = [target for target in targets if target]
     if not targets:
         errors.append("container.xml has no rootfile.")
     for target in targets:
         if target not in names:
             errors.append(f"container.xml points to a missing entry: {target}")
+    expected = {
+        "Contents/content.hpf": "application/hwpml-package+xml",
+        "Preview/PrvText.txt": "text/plain",
+        "META-INF/container.rdf": "application/rdf+xml",
+    }
+    declared = {
+        _attr(element, "full-path"): _attr(element, "media-type")
+        for element in rootfiles
+        if _attr(element, "full-path")
+    }
+    for path, media_type in expected.items():
+        if path not in declared:
+            errors.append(f"container.xml does not declare required rootfile: {path}")
+        elif declared[path] != media_type:
+            errors.append(f"container.xml has an invalid media type for {path}: {declared[path]}")
 
 
 def _validate_manifest(roots: dict[str, ET.Element], names: set[str], errors: list[str]) -> None:
     root = roots.get("Contents/content.hpf")
     if root is None:
         return
+    if _local(root.tag) != "package" or _namespace(root.tag) != HWPX_OPF_NS:
+        errors.append("content.hpf does not use the Hancom OPF package namespace.")
     ids: set[str] = set()
     targets: set[str] = set()
+    declared: dict[str, tuple[str, str]] = {}
     for element in root.iter():
         if _local(element.tag) != "item":
             continue
@@ -95,6 +147,8 @@ def _validate_manifest(roots: dict[str, ET.Element], names: set[str], errors: li
             targets.add(target)
             if target not in names:
                 errors.append(f"Manifest points to a missing entry: {href}")
+            if item_id:
+                declared[item_id] = (href, _attr(element, "media-type") or "")
     for element in root.iter():
         if _local(element.tag) == "itemref":
             idref = _attr(element, "idref")
@@ -103,12 +157,32 @@ def _validate_manifest(roots: dict[str, ET.Element], names: set[str], errors: li
     for section in (name for name in names if name.startswith("Contents/section") and name.endswith(".xml")):
         if section not in targets:
             errors.append(f"Section is not declared in the manifest: {section}")
+    expected = {
+        "header": ("Contents/header.xml", "application/xml"),
+        "section0": ("Contents/section0.xml", "application/xml"),
+        "settings": ("settings.xml", "application/xml"),
+    }
+    for item_id, value in expected.items():
+        if item_id not in declared:
+            errors.append(f"content.hpf is missing required manifest item: {item_id}")
+        elif declared[item_id] != value:
+            errors.append(
+                f"content.hpf manifest item {item_id} must be href={value[0]} and media-type={value[1]}."
+            )
+    spine = [
+        _attr(element, "idref")
+        for element in root.iter()
+        if _local(element.tag) == "itemref" and _attr(element, "idref")
+    ]
+    for required in ("header", "section0"):
+        if required not in spine:
+            errors.append(f"content.hpf spine is missing required itemref: {required}")
 
 
 def _resolve_href(href: str) -> str:
     parsed = urlparse(href)
     clean = unquote(parsed.path)
-    path = PurePosixPath("Contents") / clean
+    path = PurePosixPath(clean.lstrip("/"))
     parts: list[str] = []
     for part in path.parts:
         if part == "..":
@@ -117,6 +191,31 @@ def _resolve_href(href: str) -> str:
         elif part not in (".", ""):
             parts.append(part)
     return "/".join(parts)
+
+
+def _validate_odf_manifest(roots: dict[str, ET.Element], errors: list[str]) -> None:
+    root = roots.get("META-INF/manifest.xml")
+    if root is not None and (
+        _local(root.tag) != "manifest" or _namespace(root.tag) != ODF_MANIFEST_NS
+    ):
+        errors.append("META-INF/manifest.xml does not use the ODF manifest namespace.")
+
+
+def _validate_rdf(roots: dict[str, ET.Element], errors: list[str]) -> None:
+    root = roots.get("META-INF/container.rdf")
+    if root is None:
+        return
+    if _local(root.tag) != "RDF" or _namespace(root.tag) != RDF_NS:
+        errors.append("META-INF/container.rdf does not use the RDF namespace.")
+        return
+    resources = {
+        _attr(element, "resource")
+        for element in root.iter()
+        if _attr(element, "resource")
+    }
+    for required in ("Contents/header.xml", "Contents/section0.xml"):
+        if required not in resources:
+            errors.append(f"container.rdf does not link required document part: {required}")
 
 
 def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> None:
@@ -134,8 +233,8 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
             if local in declared and element.get("id") is not None:
                 declared[local].add(element.get("id", ""))
     bookmarks: set[str] = set()
-    field_begins: Counter[str] = Counter()
-    field_ends: Counter[str] = Counter()
+    field_begins: Counter[tuple[str, str]] = Counter()
+    field_ends: Counter[tuple[str, str]] = Counter()
     ids: Counter[tuple[str, str]] = Counter()
     for name, root in roots.items():
         if not name.startswith("Contents/section"):
@@ -155,7 +254,9 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
         for element in root.iter():
             local = _local(element.tag)
             value = element.get("id")
-            if value and local in {"p", "equation", "tbl"}:
+            # Paragraph IDs are scoped by their containing list in valid Hancom
+            # files, so only globally addressed drawing/object IDs are checked.
+            if value and local in {"equation", "tbl"}:
                 ids[(local, value)] += 1
             if local == "bookmark":
                 bookmark = element.get("name", "")
@@ -165,9 +266,9 @@ def _validate_references(roots: dict[str, ET.Element], errors: list[str]) -> Non
                     errors.append(f"{name}: duplicate bookmark name: {bookmark}")
                 bookmarks.add(bookmark)
             elif local == "fieldBegin":
-                field_begins[element.get("id", "")] += 1
+                field_begins[(element.get("id", ""), element.get("fieldid", ""))] += 1
             elif local == "fieldEnd":
-                field_ends[element.get("id", "")] += 1
+                field_ends[(element.get("beginIDRef", ""), element.get("fieldid", ""))] += 1
             if local == "run":
                 _require_declared(name, "charPrIDRef", element, declared["charPr"], errors)
             elif local == "p":

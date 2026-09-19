@@ -10,10 +10,14 @@ MIMETYPE_NAME = "mimetype"
 MIMETYPE_VALUE = b"application/hwp+zip"
 REQUIRED_ENTRIES = {
     MIMETYPE_NAME,
+    "version.xml",
+    "settings.xml",
     "Contents/header.xml",
     "Contents/section0.xml",
     "Contents/content.hpf",
     "META-INF/container.xml",
+    "META-INF/manifest.xml",
+    "META-INF/container.rdf",
     "Preview/PrvText.txt",
 }
 
@@ -61,10 +65,14 @@ def write_package(parts: dict[str, bytes], output: Path) -> None:
 
 def _package_sort_key(name: str) -> tuple[int, str]:
     order = {
-        "META-INF/container.xml": 0,
-        "Contents/content.hpf": 1,
-        "Contents/header.xml": 2,
-        "Contents/section0.xml": 3,
-        "Preview/PrvText.txt": 4,
+        "version.xml": 0,
+        "Contents/header.xml": 1,
+        "Contents/section0.xml": 2,
+        "Preview/PrvText.txt": 3,
+        "settings.xml": 4,
+        "META-INF/container.rdf": 5,
+        "Contents/content.hpf": 6,
+        "META-INF/container.xml": 7,
+        "META-INF/manifest.xml": 8,
     }
     return order.get(name, 10), name

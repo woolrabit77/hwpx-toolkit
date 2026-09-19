@@ -12,10 +12,14 @@ MIMETYPE_NAME = "mimetype"
 MIMETYPE_VALUE = b"application/hwp+zip"
 REQUIRED_ENTRIES = (
     MIMETYPE_NAME,
+    "version.xml",
+    "settings.xml",
     "Contents/header.xml",
     "Contents/section0.xml",
     "Contents/content.hpf",
     "META-INF/container.xml",
+    "META-INF/manifest.xml",
+    "META-INF/container.rdf",
     "Preview/PrvText.txt",
 )
 

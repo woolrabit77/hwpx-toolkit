@@ -8,7 +8,7 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile, ZipInfo
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE_ROOT = SKILL_ROOT.name
+ARCHIVE_ROOT = "hwp-hwpx-document-automation"
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".git"}
 EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".tmp"}
 FIXED_TIME = (2020, 1, 1, 0, 0, 0)

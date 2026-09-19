@@ -9,10 +9,11 @@
 ## Validation levels
 
 1. ZIP entry safety, order, CRC, and uncompressed `mimetype`
-2. Required parts, container targets, manifest items, and spine references
-3. XML parsing and declared object/style references
-4. Object IDs, bookmark uniqueness, and balanced fields
-5. Template fixture build and semantic object-count checks
+2. Complete Hancom package core (`version.xml`, `settings.xml`, ODF manifest, RDF container, content package, header, sections, and preview)
+3. Hancom namespaces, package-root content paths, media types, container/RDF targets, and spine references
+4. XML parsing and declared object/style references
+5. Object IDs, bookmark uniqueness, and balanced fields
+6. Template fixture build, black-default style checks, and semantic object-count checks
 
 These checks prevent common corruption errors but cannot prove pixel-identical rendering in every Hancom Office version.
 

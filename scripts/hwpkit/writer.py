@@ -11,9 +11,16 @@ HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 HS = "http://www.hancom.co.kr/hwpml/2011/section"
 HH = "http://www.hancom.co.kr/hwpml/2011/head"
 HC = "http://www.hancom.co.kr/hwpml/2011/core"
-OPF = "http://www.idpf.org/2007/opf"
+OPF = "http://www.idpf.org/2007/opf/"
 OCF = "urn:oasis:names:tc:opendocument:xmlns:container"
+HV = "http://www.hancom.co.kr/hwpml/2011/version"
+HA = "http://www.hancom.co.kr/hwpml/2011/app"
+CONFIG = "urn:oasis:names:tc:opendocument:xmlns:config:1.0"
+ODF_MANIFEST = "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"
+RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+PKG_META = "http://www.hancom.co.kr/hwpml/2016/meta/pkg#"
 XML = "http://www.w3.org/XML/1998/namespace"
+BLACK = "#000000"
 
 
 STYLE_SPECS: list[dict[str, object]] = [
@@ -45,7 +52,19 @@ STYLE_SPECS: list[dict[str, object]] = [
 ]
 STYLE_IDS = {str(spec["name"]): index for index, spec in enumerate(STYLE_SPECS)}
 
-for prefix, namespace in {"hp": HP, "hs": HS, "hh": HH, "hc": HC, "opf": OPF}.items():
+for prefix, namespace in {
+    "hp": HP,
+    "hs": HS,
+    "hh": HH,
+    "hc": HC,
+    "opf": OPF,
+    "hv": HV,
+    "ha": HA,
+    "config": CONFIG,
+    "odf": ODF_MANIFEST,
+    "rdf": RDF,
+    "pkg": PKG_META,
+}.items():
     ET.register_namespace(prefix, namespace)
 
 
@@ -56,10 +75,14 @@ def q(namespace: str, name: str) -> str:
 def serialize_document(document: Document, registry: IdRegistry) -> dict[str, bytes]:
     section, preview = _section(document, registry)
     parts = {
+        "version.xml": _version_xml(),
+        "settings.xml": _xml_bytes(_settings()),
         "Contents/header.xml": _xml_bytes(_header()),
         "Contents/section0.xml": _xml_bytes(section),
         "Contents/content.hpf": _xml_bytes(_content(document)),
         "META-INF/container.xml": _container_xml(),
+        "META-INF/manifest.xml": _xml_bytes(ET.Element(q(ODF_MANIFEST, "manifest"))),
+        "META-INF/container.rdf": _xml_bytes(_container_rdf()),
         "Preview/PrvText.txt": preview.encode("utf-8"),
     }
     return parts
@@ -89,7 +112,7 @@ def _header() -> ET.Element:
     all_hundred = {language.lower(): "100" for language in languages}
     all_zero_spacing = {language.lower(): "0" for language in languages}
     for style_id, spec in enumerate(STYLE_SPECS):
-        char_pr = ET.SubElement(char_properties, q(HH, "charPr"), {"id": str(style_id), "height": str(spec.get("size", 1000)), "textColor": "#000000", "shadeColor": "#FFFFFF", "useFontSpace": "0", "useKerning": "0", "symMark": "NONE", "borderFillIDRef": "0"})
+        char_pr = ET.SubElement(char_properties, q(HH, "charPr"), {"id": str(style_id), "height": str(spec.get("size", 1000)), "textColor": BLACK, "shadeColor": "#FFFFFF", "useFontSpace": "0", "useKerning": "0", "symMark": "NONE", "borderFillIDRef": "0"})
         font_ref = {language.lower(): str(spec.get("font", 0)) for language in languages}
         ET.SubElement(char_pr, q(HH, "fontRef"), font_ref)
         ET.SubElement(char_pr, q(HH, "ratio"), all_hundred)
@@ -128,27 +151,62 @@ def _header() -> ET.Element:
 
 
 def _content(document: Document) -> ET.Element:
-    root = ET.Element(q(OPF, "package"), {"version": "3.0", "unique-identifier": "BookId"})
+    root = ET.Element(q(OPF, "package"), {"version": "", "unique-identifier": "", "id": ""})
     metadata = ET.SubElement(root, q(OPF, "metadata"))
     ET.SubElement(metadata, q(OPF, "title")).text = document.title
-    ET.SubElement(metadata, q(OPF, "creator")).text = document.author
+    ET.SubElement(metadata, q(OPF, "language")).text = "ko"
+    creator = ET.SubElement(metadata, q(OPF, "meta"), {"name": "creator", "content": "text"})
+    creator.text = document.author
     manifest = ET.SubElement(root, q(OPF, "manifest"))
-    ET.SubElement(manifest, q(OPF, "item"), {"id": "header", "href": "header.xml", "media-type": "application/xml"})
-    ET.SubElement(manifest, q(OPF, "item"), {"id": "section0", "href": "section0.xml", "media-type": "application/xml"})
-    ET.SubElement(manifest, q(OPF, "item"), {"id": "preview", "href": "../Preview/PrvText.txt", "media-type": "text/plain"})
+    ET.SubElement(manifest, q(OPF, "item"), {"id": "header", "href": "Contents/header.xml", "media-type": "application/xml"})
+    ET.SubElement(manifest, q(OPF, "item"), {"id": "section0", "href": "Contents/section0.xml", "media-type": "application/xml"})
+    ET.SubElement(manifest, q(OPF, "item"), {"id": "settings", "href": "settings.xml", "media-type": "application/xml"})
     spine = ET.SubElement(root, q(OPF, "spine"))
+    ET.SubElement(spine, q(OPF, "itemref"), {"idref": "header", "linear": "yes"})
     ET.SubElement(spine, q(OPF, "itemref"), {"idref": "section0", "linear": "yes"})
     return root
 
 
 def _container_xml() -> bytes:
     return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        f'<container xmlns="{OCF}" version="1.0"><rootfiles>'
-        '<rootfile full-path="Contents/content.hpf" media-type="application/hwpml-package+xml"/>'
-        '<rootfile full-path="Preview/PrvText.txt" media-type="text/plain"/>'
-        '</rootfiles></container>'
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
+        f'<ocf:container xmlns:ocf="{OCF}" xmlns:hpf="http://www.hancom.co.kr/schema/2011/hpf">'
+        '<ocf:rootfiles>'
+        '<ocf:rootfile full-path="Contents/content.hpf" media-type="application/hwpml-package+xml"/>'
+        '<ocf:rootfile full-path="Preview/PrvText.txt" media-type="text/plain"/>'
+        '<ocf:rootfile full-path="META-INF/container.rdf" media-type="application/rdf+xml"/>'
+        '</ocf:rootfiles></ocf:container>'
     ).encode("utf-8")
+
+
+def _version_xml() -> bytes:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
+        f'<hv:HCFVersion xmlns:hv="{HV}" tagetApplication="WORDPROCESSOR" major="5" minor="1" '
+        'micro="1" buildNumber="0" os="1" xmlVersion="1.5" '
+        'application="Hancom Office Hangul" appVersion="HWPX Toolkit 1.0"/>'
+    ).encode("utf-8")
+
+
+def _settings() -> ET.Element:
+    root = ET.Element(q(HA, "HWPApplicationSetting"), {"xmlns:config": CONFIG})
+    ET.SubElement(root, q(HA, "CaretPosition"), {"listIDRef": "0", "paraIDRef": "1", "pos": "0"})
+    return root
+
+
+def _container_rdf() -> ET.Element:
+    root = ET.Element(q(RDF, "RDF"))
+    for path, kind in (
+        ("Contents/header.xml", "HeaderFile"),
+        ("Contents/section0.xml", "SectionFile"),
+    ):
+        document = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): ""})
+        ET.SubElement(document, q(PKG_META, "hasPart"), {q(RDF, "resource"): path})
+        part = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): path})
+        ET.SubElement(part, q(RDF, "type"), {q(RDF, "resource"): f"{PKG_META}{kind}"})
+    document_type = ET.SubElement(root, q(RDF, "Description"), {q(RDF, "about"): ""})
+    ET.SubElement(document_type, q(RDF, "type"), {q(RDF, "resource"): f"{PKG_META}Document"})
+    return root
 
 
 def _section(document: Document, registry: IdRegistry) -> tuple[ET.Element, str]:
@@ -236,7 +294,7 @@ def _write_run(parent: ET.Element, model: Run, registry: IdRegistry, style_id: i
                 "lock": "0",
                 "version": "Equation Version 60",
                 "baseLine": str(baseline),
-                "textColor": "#000000",
+                "textColor": BLACK,
                 "baseUnit": "1000",
                 "lineMode": "CHAR",
                 "font": "HYhwpEQ",
@@ -253,18 +311,20 @@ def _write_run(parent: ET.Element, model: Run, registry: IdRegistry, style_id: i
         target_id = registry.require_target(model.crossref)
         model.text = model.text or str(target_id)
         link = f"#{model.crossref}"
+    begin_id: int | None = None
     field_id: int | None = None
     if link:
-        field_id = registry.allocate("field") + 2000
+        begin_id = registry.allocate("field_begin") + 2000
+        field_id = registry.allocate("field_instance") + 3000
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
-        ET.SubElement(ctrl, q(HP, "fieldBegin"), {"id": str(field_id), "type": "HYPERLINK", "name": link, "editable": "0", "dirty": "0", "zorder": "-1", "fieldid": str(field_id)})
+        ET.SubElement(ctrl, q(HP, "fieldBegin"), {"id": str(begin_id), "type": "HYPERLINK", "name": link, "editable": "0", "dirty": "0", "zorder": "-1", "fieldid": str(field_id)})
     text = ET.SubElement(run, q(HP, "t"))
     text.text = model.text
     if model.text[:1].isspace() or model.text[-1:].isspace():
         text.set(q(XML, "space"), "preserve")
-    if field_id is not None:
+    if begin_id is not None and field_id is not None:
         ctrl = ET.SubElement(run, q(HP, "ctrl"))
-        ET.SubElement(ctrl, q(HP, "fieldEnd"), {"id": str(field_id)})
+        ET.SubElement(ctrl, q(HP, "fieldEnd"), {"beginIDRef": str(begin_id), "fieldid": str(field_id)})
 
 
 def _write_table(
@@ -330,12 +390,13 @@ def _write_table(
             cp.set("paraPrIDRef", str(cell_style_id))
             cr = ET.SubElement(cp, q(HP, "run"), {"charPrIDRef": str(cell_style_id)})
             if cell_model.formula:
-                fid = registry.allocate("field") + 2000
+                begin_id = registry.allocate("field_begin") + 2000
+                field_id = registry.allocate("field_instance") + 3000
                 ctrl = ET.SubElement(cr, q(HP, "ctrl"))
-                ET.SubElement(ctrl, q(HP, "fieldBegin"), {"id": str(fid), "type": "FORMULA", "name": cell_model.formula, "editable": "1", "dirty": "0", "zorder": "-1", "fieldid": str(fid)})
+                ET.SubElement(ctrl, q(HP, "fieldBegin"), {"id": str(begin_id), "type": "FORMULA", "name": cell_model.formula, "editable": "1", "dirty": "0", "zorder": "-1", "fieldid": str(field_id)})
                 ET.SubElement(cr, q(HP, "t")).text = cell_model.value
                 end = ET.SubElement(cr, q(HP, "ctrl"))
-                ET.SubElement(end, q(HP, "fieldEnd"), {"id": str(fid)})
+                ET.SubElement(end, q(HP, "fieldEnd"), {"beginIDRef": str(begin_id), "fieldid": str(field_id)})
             else:
                 ET.SubElement(cr, q(HP, "t")).text = cell_model.value
     ET.SubElement(run, q(HP, "t"))

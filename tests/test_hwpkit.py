@@ -4,7 +4,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from zipfile import ZipFile
+from xml.etree import ElementTree as ET
+from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 from scripts.export_skill import export_skill
 from scripts.hwpkit.equations import estimate_equation_box, normalize_equation
@@ -78,6 +79,98 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(inspected["tables"], 1)
             self.assertEqual(inspected["equations"], 1)
             self.assertEqual(inspected["footnotes"], 1)
+
+    def test_build_emits_complete_hancom_package_and_root_relative_manifest_paths(self) -> None:
+        spec = {"metadata": {"title": "Package test", "author": "Codex"}, "blocks": []}
+        required = {
+            "version.xml",
+            "settings.xml",
+            "META-INF/manifest.xml",
+            "META-INF/container.rdf",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as archive:
+                self.assertTrue(required.issubset(archive.namelist()))
+                content = ET.fromstring(archive.read("Contents/content.hpf"))
+                items = {
+                    element.get("id"): (element.get("href"), element.get("media-type"))
+                    for element in content.iter()
+                    if element.tag.rsplit("}", 1)[-1] == "item"
+                }
+                self.assertEqual(items["header"], ("Contents/header.xml", "application/xml"))
+                self.assertEqual(items["section0"], ("Contents/section0.xml", "application/xml"))
+                self.assertEqual(items["settings"], ("settings.xml", "application/xml"))
+                spine = [
+                    element.get("idref")
+                    for element in content.iter()
+                    if element.tag.rsplit("}", 1)[-1] == "itemref"
+                ]
+                self.assertEqual(spine, ["header", "section0"])
+
+    def test_validator_rejects_package_missing_hancom_required_part(self) -> None:
+        spec = {"metadata": {"title": "Corruption test", "author": "Codex"}, "blocks": []}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            broken = root / "broken.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as source, ZipFile(broken, "w") as target:
+                for info in source.infolist():
+                    if info.filename == "version.xml":
+                        continue
+                    compression = ZIP_STORED if info.filename == "mimetype" else ZIP_DEFLATED
+                    target.writestr(info.filename, source.read(info.filename), compress_type=compression)
+            result = validate_document(broken)
+            self.assertFalse(result["valid"])
+            self.assertTrue(any("version.xml" in error for error in result["errors"]))
+
+    def test_validator_rejects_legacy_content_hpf_relative_paths(self) -> None:
+        spec = {"metadata": {"title": "Path test", "author": "Codex"}, "blocks": []}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            broken = root / "broken.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as source, ZipFile(broken, "w") as target:
+                for info in source.infolist():
+                    payload = source.read(info.filename)
+                    if info.filename == "Contents/content.hpf":
+                        payload = payload.replace(b'href="Contents/header.xml"', b'href="header.xml"')
+                    compression = ZIP_STORED if info.filename == "mimetype" else ZIP_DEFLATED
+                    target.writestr(info.filename, payload, compress_type=compression)
+            result = validate_document(broken)
+            self.assertFalse(result["valid"])
+            self.assertTrue(any("header" in error for error in result["errors"]))
+
+    def test_all_generated_text_colors_are_black(self) -> None:
+        spec = {
+            "metadata": {"title": "Black text", "author": "Codex"},
+            "blocks": [
+                {"type": "paragraph", "runs": [{"text": "Link", "hyperlink": "https://example.com"}]},
+                {"type": "equation", "script": "x+1=2"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            spec_path = root / "request.json"
+            output = root / "result.hwpx"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            build_document(spec_path, output)
+            with ZipFile(output) as archive:
+                for name in ("Contents/header.xml", "Contents/section0.xml"):
+                    xml = ET.fromstring(archive.read(name))
+                    colors = [element.get("textColor") for element in xml.iter() if element.get("textColor")]
+                    self.assertTrue(colors)
+                    self.assertEqual(set(colors), {"#000000"})
 
 
 class TemplateTests(unittest.TestCase):
