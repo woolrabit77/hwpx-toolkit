@@ -22,7 +22,7 @@
 | ID | Feature | Acceptance evidence required | Status | Verified commit | Terra report |
 |---|---|---|---|---|---|
 | P01 | Tabs, indents, bullets, and numbering | Numbering XML, tab/indent fixture, invalid-level rejection | MERGED | 58c36cb | docs/evidence/verification-P01.md @ 6f66459 |
-| P02 | Headers, footers, page numbers, page/section breaks | Multi-section fixture, page-number field inspection, package validation | NOT_STARTED | — | — |
+| P02 | Headers, footers, page numbers, page/section breaks | Multi-section fixture, page-number field inspection, package validation | IMPLEMENTING | — | — |
 | P03 | Table merge, split, shading, and extended formulas | Spanned-cell grid fixture, shading fixture, formula success/failure tests | NOT_STARTED | — | — |
 | P04 | Captions, equation numbering, cross-references, TOC page references | Numbered target fixture, update/rebuild test, broken-target rejection | NOT_STARTED | — | — |
 | P05 | Footnote/endnote continuation and existing-document round trip | Multi-section note fixture, parse/write equality or explicit safe refusal | NOT_STARTED | — | — |
