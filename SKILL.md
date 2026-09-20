@@ -25,15 +25,20 @@ Do not hand-author HWPX XML. Write a small JSON Document Spec and pass it to the
 
 ## Workflow
 
-1. Select an approved template when its document family matches the request.
-2. Express content as template `data` and optional additional `blocks`.
-3. Run `build`; full validation runs automatically.
-4. If validation fails, the output is deleted. Fix the reported JSON or content issue and rebuild.
-5. Use `inspect` when object counts, bookmarks, fields, tables, or equations matter.
+Keep the default authoring path lightweight and untemplated.
 
-Read [references/document-spec.md](references/document-spec.md) for JSON syntax. Read [references/templates.md](references/templates.md) for template selection and fields. Read [references/feature-status.md](references/feature-status.md) for support boundaries.
+1. Read the request and choose the smallest document structure that satisfies it.
+2. Before writing the JSON Document Spec, give the user one short checkpoint describing the intended layout, sections, tables, images, and other important elements. Ask for confirmation once. Do not add further checkpoints unless the requested structure materially changes.
+3. After confirmation, write a minimal untemplated Document Spec. Omit `template` or set it to `null`.
+4. Run `build`; full validation runs automatically.
+5. If validation fails, the output is deleted. Fix the reported JSON or content issue and rebuild.
+6. Use `inspect` only when object counts, bookmarks, fields, tables, equations, or another structural detail needs verification.
 
-## Approved templates
+Use a template only when the user explicitly requests a specific available template or explicitly asks to use the skill's preset templates. Never infer template use from the document's purpose, such as a request for an official letter, press release, form, exam, article, or report. When no template was explicitly requested, do not list, inspect, load, or apply template resources. If a template is explicitly requested, express its content as template `data` with optional additional `blocks`.
+
+Read [references/document-spec.md](references/document-spec.md) for JSON syntax. Read [references/templates.md](references/templates.md) only after the user explicitly requests a template. Read [references/feature-status.md](references/feature-status.md) when support boundaries matter.
+
+## Approved templates for explicit requests
 
 - `official-letter`: Korean public-sector outgoing letter
 - `press-release`: government press release
@@ -44,7 +49,7 @@ Read [references/document-spec.md](references/document-spec.md) for JSON syntax.
 - `academic-stem`: compact two-column STEM article
 - `policy-report`: policy or research report
 
-The source definitions are in `assets/templates/specs/`. Blank validated HWPX files are in `assets/templates/golden/`. Starter requests are in `assets/templates/examples/`.
+These presets are opt-in and may be incomplete. Do not use one merely because it resembles the requested document type. The source definitions are in `assets/templates/specs/`. Blank validated HWPX files are in `assets/templates/golden/`. Starter requests are in `assets/templates/examples/`.
 
 ## Accuracy rules
 

@@ -2,7 +2,11 @@
 
 The public authoring input is UTF-8 JSON.
 
-## Template request
+The default authoring path is untemplated. Before writing the spec, give the user one concise checkpoint describing the intended document structure and get confirmation. Then omit `template` or set it to `null` and include only the metadata and blocks the document needs.
+
+Use a template request only when the user explicitly names a specific template or explicitly asks to use the skill's preset templates. A document type or purpose alone is not permission to select a template.
+
+## Template request (explicit opt-in only)
 
 ```json
 {
