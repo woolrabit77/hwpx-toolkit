@@ -88,11 +88,11 @@ Charts, tracked-change generation, encryption, distribution documents, and digit
 
 ## Temporary files
 
-The build pipeline keeps only the atomic temporary package beside the final output and deletes it on success or failure. Use `cleanup_hwp_job.py` only for legacy analysis jobs that require a separate working directory.
+The build pipeline keeps only the atomic temporary package beside the final output and deletes it on success or failure.
 
 ## Existing documents
 
-New-document generation is the reliable standalone path. Lossless editing of an existing complex HWPX is allowed only for features with parser/writer round-trip fixtures. Legacy utilities remain diagnostic or compatibility helpers; they are not the public authoring interface.
+New-document generation is the reliable standalone path. Lossless editing of an existing complex HWPX is allowed only for features with parser/writer round-trip fixtures. Legacy binary HWP conversion and standalone repair utilities are outside the public interface.
 
 ## Export
 

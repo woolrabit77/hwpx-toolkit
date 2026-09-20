@@ -1,3 +1,4 @@
-display_name: Standalone HWPX Document Automation
-short_description: Create and validate Korean HWPX files without Hancom or internet access.
-default_prompt: Convert the request into a compact Document Spec, select an approved template when appropriate, build the HWPX file with the single CLI, and run full validation.
+interface:
+  display_name: "Standalone HWPX Document Automation"
+  short_description: "Create and validate Korean HWPX documents offline."
+  default_prompt: "Use $hwp-hwpx-document-automation to plan, confirm, build, and validate a minimal untemplated HWPX document; use a preset only when I explicitly request one."
